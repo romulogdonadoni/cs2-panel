@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+build
+dist
+*.log
+panel.db
+panel.db-journal
+.env
+data/
+cs2-data/

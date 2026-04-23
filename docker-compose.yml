@@ -1,0 +1,60 @@
+services:
+  cs2:
+    image: cm2network/cs2
+    container_name: cs2-server
+    network_mode: host
+    env_file: .env
+    environment:
+      # STEAMAPPVALIDATE=1 força validação Steam (lento); usar só se suspeitares de ficheiros corrompidos.
+      - STEAMAPPVALIDATE=${STEAMAPPVALIDATE:-0}
+      - SRCDS_TOKEN=${SRCDS_TOKEN:?set in .env}
+      - CS2_SERVERNAME=${CS2_SERVERNAME:-changeme}
+      - CS2_STARTMAP=${CS2_STARTMAP:-de_dust2}
+      - CS2_MAPGROUP=${CS2_MAPGROUP:-mg_active}
+      - CS2_GAMETYPE=${CS2_GAMETYPE:-0}
+      - CS2_GAMEMODE=${CS2_GAMEMODE:-1}
+      - CS2_MAXPLAYERS=${CS2_MAXPLAYERS:-12}
+      - CS2_RCONPW=${CS2_RCONPW:-changeme}
+      - CS2_PW=${CS2_PW:-}
+      - CS2_HOST_WORKSHOP_MAP=${CS2_HOST_WORKSHOP_MAP:-}
+      - CS2_HOST_WORKSHOP_COLLECTION=${CS2_HOST_WORKSHOP_COLLECTION:-}
+      # O entry.sh da imagem usa esta var com `set -u`; tem de existir mesmo vazia.
+      - CS2_HOST_WORKSHOP_COLLECTION_ARGS=${CS2_HOST_WORKSHOP_COLLECTION_ARGS:-}
+      - CS2_GAMEALIAS=${CS2_GAMEALIAS:-}
+    volumes:
+      - ./cs2-data:/home/steam/cs2-dedicated
+    restart: unless-stopped
+
+  panel:
+    build: ./panel
+    container_name: cs2-panel
+    network_mode: host
+    env_file: .env
+    environment:
+      - PANEL_BASE_URL=${PANEL_BASE_URL:-http://127.0.0.1:3080}
+      - SESSION_SECRET=${SESSION_SECRET:?set in .env}
+      - LOADOUT_API_KEY=${LOADOUT_API_KEY:?set in .env}
+      - PANEL_DATA_DIR=/data
+      - PANEL_COMPOSE_DIR=/project
+      - DATABASE_URL=file:/data/panel.db
+    volumes:
+      - .:/project
+      - panel-data:/data
+  db-skins:
+    image: mysql:8.0
+    container_name: cs2-db-skins
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      - MYSQL_ROOT_PASSWORD=skins_root_pass
+      - MYSQL_DATABASE=weapon_paints
+      - MYSQL_USER=wp_user
+      - MYSQL_PASSWORD=wp_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - skins-db-data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  panel-data:
+  skins-db-data:

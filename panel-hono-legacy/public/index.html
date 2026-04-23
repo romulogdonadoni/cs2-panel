@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CS2 — Loadout</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-title">CS2 Painel</span>
+          <span class="brand-sub">loadout e servidor</span>
+        </div>
+        <div id="user-bar" class="user-bar">
+          <span id="user-line">A carregar…</span>
+          <button type="button" class="btn btn-ghost hidden" id="btn-lobby-create">+ Criar lobby</button>
+          <span class="lobby-join hidden" id="lobby-join-wrap">
+            <input type="text" id="lobby-code-in" placeholder="Código" maxlength="8" class="lobby-code-input" />
+            <button type="button" class="btn btn-ghost" id="btn-lobby-join">Entrar</button>
+          </span>
+          <a class="btn btn-ghost" id="btn-login" href="/auth/steam">Entrar com Steam</a>
+        </div>
+      </header>
+
+      <div id="gate" class="gate hidden">
+        <div class="card">
+          <h2>Conta</h2>
+          <p class="muted">Autentica-te para escolher skins, agentes e kit de música.</p>
+        </div>
+      </div>
+
+      <div id="app" class="app hidden">
+        <aside class="sidebar">
+          <div class="sidebar-block">
+            <label class="sidebar-label">Coleções</label>
+            <select class="sel" id="collection-select" disabled>
+              <option>Main</option>
+            </select>
+          </div>
+          <nav class="side-nav" id="section-nav">
+            <button type="button" class="side-item is-active" data-section="skins">
+              <span class="side-icon" aria-hidden="true">🧤</span>
+              <span class="side-text">
+                <strong>Skins</strong>
+                <small>Armas, facas, luvas</small>
+              </span>
+            </button>
+            <button type="button" class="side-item" data-section="agents">
+              <span class="side-icon" aria-hidden="true">🕵</span>
+              <span class="side-text">
+                <strong>Agentes</strong>
+                <small>CT / Terrorista</small>
+              </span>
+            </button>
+            <button type="button" class="side-item" data-section="music">
+              <span class="side-icon" aria-hidden="true">🎵</span>
+              <span class="side-text">
+                <strong>Kit de música</strong>
+                <small>MVP e menu</small>
+              </span>
+            </button>
+          </nav>
+        </aside>
+
+        <main class="main">
+          <section class="section" id="section-skins">
+            <div class="toolbar">
+              <div class="filters" id="skin-filters" role="tablist" aria-label="Categoria de arma">
+                <button type="button" class="fchip is-on" data-filter="all" title="Tudo">⊞</button>
+                <button type="button" class="fchip" data-filter="knife" title="Facas">🗡</button>
+                <button type="button" class="fchip" data-filter="gloves" title="Luvas">🧤</button>
+                <button type="button" class="fchip" data-filter="rifle" title="Rifles">AR</button>
+                <button type="button" class="fchip" data-filter="sniper" title="Snipers">AW</button>
+                <button type="button" class="fchip" data-filter="pistol" title="Pistolas">P</button>
+                <button type="button" class="fchip" data-filter="smg" title="SMG">S</button>
+                <button type="button" class="fchip" data-filter="shotgun" title="Shotguns">SG</button>
+                <button type="button" class="fchip" data-filter="heavy" title="Pesado">H</button>
+              </div>
+              <div class="search-wrap">
+                <input type="search" class="search" id="grid-search" placeholder="Pesquisar por nome" autocomplete="off" />
+              </div>
+            </div>
+            <p class="catalog-hint muted" id="skins-hint"></p>
+            <div class="grid" id="skins-grid" aria-live="polite"></div>
+            <div class="load-more-wrap">
+              <button type="button" class="btn btn-secondary" id="skins-more">Carregar mais</button>
+            </div>
+          </section>
+
+          <section class="section hidden" id="section-agents">
+            <div class="toolbar">
+              <div class="filters" id="agent-team">
+                <button type="button" class="fchip is-on" data-team="all">Todos</button>
+                <button type="button" class="fchip" data-team="ct">CT</button>
+                <button type="button" class="fchip" data-team="t">T</button>
+              </div>
+              <div class="search-wrap">
+                <input type="search" class="search" id="agents-search" placeholder="Pesquisar agente" autocomplete="off" />
+              </div>
+            </div>
+            <p class="catalog-hint muted" id="agents-hint">Escolhe um agente com duplo clique na equipa certa, ou toque simples e “Aplicar”.</p>
+            <div class="grid" id="agents-grid"></div>
+            <div class="load-more-wrap">
+              <button type="button" class="btn btn-secondary" id="agents-more">Carregar mais</button>
+            </div>
+            <div class="agent-actions card slim">
+              <p class="small">
+                Aplicar último selecionado a:
+                <button type="button" class="btn btn-small" data-apply-agent="ct">Só CT</button>
+                <button type="button" class="btn btn-small" data-apply-agent="t">Só T</button>
+                <button type="button" class="btn btn-small" data-apply-agent="both">CT + T</button>
+              </p>
+            </div>
+          </section>
+
+          <section class="section hidden" id="section-music">
+            <div class="toolbar">
+              <div class="search-wrap stretch">
+                <input type="search" class="search" id="music-search" placeholder="Pesquisar kit de música" autocomplete="off" />
+              </div>
+            </div>
+            <div class="grid" id="music-grid"></div>
+            <div class="load-more-wrap">
+              <button type="button" class="btn btn-secondary" id="music-more">Carregar mais</button>
+            </div>
+          </section>
+        </main>
+
+        <aside class="selection-rail">
+          <h3>Selecionado</h3>
+          <p class="small muted" id="save-status">Alterações guardadas.</p>
+          <div id="selection-summary" class="selection-list"></div>
+        </aside>
+      </div>
+
+      <div id="server-panel" class="server-panel card hidden">
+        <button type="button" class="collapse-toggle" id="server-toggle" aria-expanded="true">
+          Servidor Docker (mapa, <code>CS2_*</code>, GSLT) ▾
+        </button>
+        <div class="server-body" id="server-body">
+          <p class="small muted">Escreve a raiz <code>.env</code>. Depois: <code>docker compose up -d cs2</code></p>
+          <div id="server-fields" class="grid form-grid"></div>
+          <p>
+            <button type="button" class="btn" id="btn-save-server">Guardar .env</button>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/loadout-ui.js"></script>
+  </body>
+</html>

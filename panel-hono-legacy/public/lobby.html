@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lobby — CS2</title>
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/lobby.css" />
+  </head>
+  <body class="lobby-page">
+    <div id="lobby-err" class="lobby-err hidden"></div>
+    <div id="lobby-gate" class="lobby-gate hidden">
+      <p>Precisas de sessão Steam para aceder a esta lobby.</p>
+      <a class="btn" href="/auth/steam">Entrar com Steam</a>
+    </div>
+
+    <div id="lobby-root" class="lobby-root hidden">
+      <header class="lobby-top">
+        <a class="btn btn-ghost" href="/">← Voltar à lista / início</a>
+        <div class="lobby-top-actions">
+          <button type="button" class="btn btn-ghost" id="btn-copy-invite">+ Copiar link do lobby</button>
+          <button type="button" class="btn btn-danger hidden" id="btn-delete-lobby">Excluir lobby</button>
+        </div>
+      </header>
+
+      <div class="lobby-main">
+        <section class="lobby-teams">
+          <div class="team-col" data-team="1">
+            <div class="team-hdr">
+              <h2 id="t1-name">Time 1</h2>
+              <button type="button" class="icon-btn" id="edit-t1" title="Editar nome" aria-label="Editar time 1">✎</button>
+              <div class="size-ctrl" id="size-ctrl">
+                <button type="button" class="icon-btn" id="team-size-min">−</button>
+                <span id="max-per-t">5</span>
+                <button type="button" class="icon-btn" id="team-size-plus">+</button>
+              </div>
+            </div>
+            <ul class="team-slots" id="slots-1"></ul>
+            <button type="button" class="btn join-team" data-join="1" id="join-1">+ Entrar no time</button>
+          </div>
+
+          <div class="lobby-center">
+            <div class="map-card" id="map-card">
+              <div class="map-ph" id="map-ph"></div>
+              <p class="lobby-id">ID do lobby <strong id="lobby-id-lbl">#</strong></p>
+            </div>
+            <div class="score-big"><span id="score-disp">-</span> : <span id="score-disp2">-</span></div>
+            <p class="meta"><strong>Modo de jogo:</strong> <span id="mode-lbl">—</span></p>
+            <p class="meta">
+              <strong>Localização:</strong> <span id="region-lbl">—</span> <span id="ms-lbl" class="muted"></span>
+            </p>
+            <div class="status-pill" id="status-pill">Aguardando jogadores 0/10</div>
+            <p class="muted small" style="margin-top: 0.5rem">
+              <a href="/">Configurar skins e agentes</a> no loadout
+            </p>
+            <p class="small"><button type="button" class="linkish" id="join-spec">Entrar como espectador</button></p>
+          </div>
+
+          <div class="team-col" data-team="2">
+            <div class="team-hdr">
+              <h2 id="t2-name">Time 2</h2>
+              <button type="button" class="icon-btn" id="edit-t2" title="Editar nome" aria-label="Editar time 2">✎</button>
+            </div>
+            <ul class="team-slots" id="slots-2"></ul>
+            <button type="button" class="btn join-team" data-join="2" id="join-2">+ Entrar no time</button>
+          </div>
+        </section>
+
+        <div class="lobby-bottom-row">
+        <section class="spectators card">
+          <h3>Espectadores</h3>
+          <ul id="spec-list" class="spec-list"></ul>
+        </section>
+
+        <section class="lobby-right card">
+          <div class="tabs">
+            <button type="button" class="tab is-on" data-tab="cfg">Configurações da partida</button>
+            <button type="button" class="tab" data-tab="chat">Chat do Lobby</button>
+          </div>
+          <div id="panel-cfg" class="tab-pan">
+            <div class="row">
+              <label>Modo</label>
+              <select id="f-mode">
+                <option value="competitive">Competitivo</option>
+                <option value="casual">Casual</option>
+                <option value="wingman">Wingman</option>
+                <option value="deathmatch">Deathmatch</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>Lobby</label>
+              <select id="f-lobby-visibility">
+                <option value="public">Público</option>
+                <option value="private">Privado (só com link)</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>Seleção de mapa</label>
+              <select id="f-map-sel">
+                <option value="selected">Mapa selecionado</option>
+                <option value="vote">Votação</option>
+                <option value="random">Aleatório</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>Mapa</label>
+              <select id="f-map"></select>
+            </div>
+            <div class="row">
+              <label>Região</label>
+              <select id="f-region">
+                <option value="sao_paulo">São Paulo</option>
+                <option value="miami">Miami</option>
+                <option value="europe">Europa (Frankfurt)</option>
+                <option value="custom">Personalizado (servidor Docker)</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>Seleção de times</label>
+              <select id="f-team-sel">
+                <option value="knife_round">Ronda de facas</option>
+                <option value="captains">Capitães</option>
+                <option value="free">Livre</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>Chat de voz</label>
+              <select id="f-voice">
+                <option value="all">Todos</option>
+                <option value="team">Só equipa</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+            <div class="row toggle-row">
+              <span>Seleção de time livre</span>
+              <label class="sw"><input type="checkbox" id="f-free" checked /><i></i></label>
+            </div>
+            <div class="row toggle-row">
+              <span>Bots</span>
+              <label class="sw"><input type="checkbox" id="f-bots" /><i></i></label>
+            </div>
+            <div class="row toggle-row">
+              <span>Verificação de prontidão</span>
+              <label class="sw"><input type="checkbox" id="f-ready" checked /><i></i></label>
+            </div>
+            <div class="row toggle-row">
+              <span>Configurações adicionais</span>
+              <label class="sw"><input type="checkbox" id="f-extra" /><i></i></label>
+            </div>
+            <div class="row toggle-row">
+              <span>Configurações divertidas</span>
+              <label class="sw"><input type="checkbox" id="f-fun" /><i></i></label>
+            </div>
+            <button type="button" class="btn full" id="btn-save-preset" disabled>Salvar preset</button>
+          </div>
+          <div id="panel-chat" class="tab-pan hidden">
+            <p class="muted">Chat em tempo real: usa Discord ou a mesma liga por enquanto.</p>
+            <p class="small">Código copiado: <code id="chat-code">—</code></p>
+          </div>
+        </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="self-bar" class="self-bar hidden">
+      <label class="self-ready"><input type="checkbox" id="self-ready" /> Pronto</label>
+    </div>
+
+    <script type="module" src="/lobby.js"></script>
+  </body>
+</html>

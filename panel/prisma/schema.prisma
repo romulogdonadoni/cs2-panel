@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Loadout {
+  steamid64 String   @id
+  body      String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("loadouts")
+}
+
+model Lobby {
+  id              String        @id @default(uuid())
+  code            String        @unique
+  leaderSteamid64 String        @map("leader_steamid64")
+  team1Name       String        @default("Time 1") @map("team1_name")
+  team2Name       String        @default("Time 2") @map("team2_name")
+  mapId           String        @default("de_mirage") @map("map_id")
+  gameMode        String        @default("competitive") @map("game_mode")
+  region          String        @default("sao_paulo")
+  maxPerTeam      Int           @default(5) @map("max_per_team")
+  status          String        @default("open")
+  settingsJson    String        @default("{}") @map("settings_json")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  members         LobbyMember[]
+  matches         Match[]
+
+  @@map("lobbies")
+}
+
+model LobbyMember {
+  lobbyId   String   @map("lobby_id")
+  steamid64 String
+  team      Int      @default(0)
+  isReady   Boolean  @default(false) @map("is_ready")
+  isLeader  Boolean  @default(false) @map("is_leader")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  lobby     Lobby    @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+
+  @@id([lobbyId, steamid64])
+  @@map("lobby_members")
+}
+
+// ─── Match System ────────────────────────────────────────────
+
+model Match {
+  id          String        @id @default(uuid())
+  lobbyId     String        @map("lobby_id")
+  mapId       String        @map("map_id")
+  team1Name   String        @default("Time 1") @map("team1_name")
+  team2Name   String        @default("Time 2") @map("team2_name")
+  /// status: warmup | live | finished | cancelled
+  status      String        @default("warmup")
+  score1      Int           @default(0) @map("score_1")
+  score2      Int           @default(0) @map("score_2")
+  winner      Int?
+  matchzyId   String?       @unique @map("matchzy_id")
+  webhookData String?       @map("webhook_data")
+  startedAt   DateTime      @default(now()) @map("started_at")
+  endedAt     DateTime?     @map("ended_at")
+  lobby       Lobby         @relation(fields: [lobbyId], references: [id])
+  players     MatchPlayer[]
+
+  @@map("matches")
+}
+
+model MatchPlayer {
+  matchId   String @map("match_id")
+  steamid64 String
+  team      Int
+  kills     Int    @default(0)
+  deaths    Int    @default(0)
+  assists   Int    @default(0)
+  adr       Float  @default(0)
+  match     Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@id([matchId, steamid64])
+  @@map("match_players")
+}
+
+// ─── Ranking ─────────────────────────────────────────────────
+
+model PlayerRating {
+  steamid64 String   @id
+  elo       Int      @default(1000)
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  draws     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("player_ratings")
+}
