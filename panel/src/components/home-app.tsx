@@ -33,23 +33,6 @@ import {
   toPersist,
 } from "@/lib/loadout-types";
 
-const SKIN_FILTERS: { id: string; label: string }[] = [
-  { id: "all", label: "Tudo" },
-  { id: "knife", label: "Facas" },
-  { id: "gloves", label: "Luvas" },
-  { id: "rifle", label: "Rifles" },
-  { id: "sniper", label: "Sniper" },
-  { id: "pistol", label: "Pistolas" },
-  { id: "smg", label: "SMG" },
-  { id: "shotgun", label: "Shotgun" },
-  { id: "heavy", label: "Pesado" },
-];
-
-const AGENT_TEAMS: { id: string; label: string }[] = [
-  { id: "all", label: "Todos" },
-  { id: "ct", label: "CT" },
-  { id: "t", label: "T" },
-];
 
 const ESSENTIAL_SLOTS = [
   { id: "knife", label: "Faca" },
@@ -70,9 +53,6 @@ type Me = {
   profileUrl: string | null;
 } | null;
 
-type MusicItem = { id: string; name: string; image?: string; def_index?: string };
-
-type AgentItem = { id: string; name: string; image: string; def_index: string; team: { id: string; name: string } };
 
 function countLoadoutPicks(Lo: LoadoutV1): number {
   const w = Object.keys(Lo.weapons).length;
@@ -88,33 +68,10 @@ export function HomeApp() {
   const [saving, setSaving] = useState(false);
   const [lobbyCode, setLobbyCode] = useState("");
   const [activeLobbyCode, setActiveLobbyCode] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("skins");
+  const [activeTab, setActiveTab] = useState<string>("lobby");
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const [skinFilter, setSkinFilter] = useState("all");
-  const [skinQ, setSkinQ] = useState("");
-  const [skinItems, setSkinItems] = useState<SkinCatalogRow[]>([]);
-  const [skinTotal, setSkinTotal] = useState(0);
-  const [skinOff, setSkinOff] = useState(0);
 
-  const [agentTeam, setAgentTeam] = useState("all");
-  const [agentQ, setAgentQ] = useState("");
-  const [agentItems, setAgentItems] = useState<AgentItem[]>([]);
-
-  const [musicQ, setMusicQ] = useState("");
-  const [musicItems, setMusicItems] = useState<MusicItem[]>([]);
-
-  const [configSkin, setConfigSkin] = useState<SkinCatalogRow | null>(null);
-
-  const skinFilterLabel = useMemo(
-    () => SKIN_FILTERS.find((f) => f.id === skinFilter)?.label ?? "Categoria",
-    [skinFilter]
-  );
-
-  const agentTeamLabel = useMemo(
-    () => AGENT_TEAMS.find((f) => f.id === agentTeam)?.label ?? "Equipa",
-    [agentTeam]
-  );
 
   const refreshMe = useCallback(async () => {
     const r = await fetch("/api/me", { credentials: "include" });
@@ -141,78 +98,6 @@ export function HomeApp() {
     })();
   }, [me]);
 
-  const fetchSkins = useCallback(async () => {
-    const u = new URL("/api/catalog/skins", location.origin);
-    u.searchParams.set("filter", skinFilter);
-    u.searchParams.set("q", skinQ);
-    u.searchParams.set("offset", String(skinOff));
-    u.searchParams.set("limit", "48");
-    const r = await fetch(u, { credentials: "include" });
-    const j = (await r.json()) as {
-      items: SkinCatalogRow[];
-      total: number;
-      error?: string;
-    };
-    if (j.error) {
-      setErr(j.error);
-    }
-    setSkinItems(
-      (j.items || []).map((s) => ({
-        ...s,
-        weapon: { id: s.weapon.id, name: s.weapon.name },
-      }))
-    );
-    setSkinTotal(j.total);
-  }, [skinFilter, skinQ, skinOff]);
-
-  useEffect(() => {
-    if (!me) {
-      return;
-    }
-    const t = setTimeout(() => void fetchSkins(), 200);
-    return () => clearTimeout(t);
-  }, [me, fetchSkins]);
-
-  const fetchAgents = useCallback(async () => {
-    const u = new URL("/api/catalog/agents", location.origin);
-    u.searchParams.set("team", agentTeam);
-    u.searchParams.set("q", agentQ);
-    u.searchParams.set("limit", "60");
-    const r = await fetch(u, { credentials: "include" });
-    const j = (await r.json()) as { items: AgentItem[]; error?: string };
-    if (j.error) {
-      setErr(j.error);
-    }
-    setAgentItems(j.items);
-  }, [agentTeam, agentQ]);
-
-  useEffect(() => {
-    if (!me) {
-      return;
-    }
-    const t = setTimeout(() => void fetchAgents(), 200);
-    return () => clearTimeout(t);
-  }, [me, fetchAgents]);
-
-  const fetchMusic = useCallback(async () => {
-    const u = new URL("/api/catalog/music", location.origin);
-    u.searchParams.set("q", musicQ);
-    u.searchParams.set("limit", "40");
-    const r = await fetch(u, { credentials: "include" });
-    const j = (await r.json()) as { items: MusicItem[]; error?: string };
-    if (j.error) {
-      setErr(j.error);
-    }
-    setMusicItems(j.items);
-  }, [musicQ]);
-
-  useEffect(() => {
-    if (!me) {
-      return;
-    }
-    const t = setTimeout(() => void fetchMusic(), 200);
-    return () => clearTimeout(t);
-  }, [me, fetchMusic]);
 
   async function saveLoadout(Lo: LoadoutV1) {
     setSaving(true);
@@ -233,66 +118,7 @@ export function HomeApp() {
     }
   }
 
-  function equipWeaponSkin(item: SkinCatalogRow) {
-    const wId = item.weapon.id;
-    const prev = loadout.weapons[wId];
-    const cfg: WeaponSlotConfig = {
-      skinId: item.id,
-      name: item.name,
-      float: prev?.skinId === item.id && prev ? prev.float : midFloat(item.min_float, item.max_float),
-      stattrak: prev?.skinId === item.id && prev ? prev.stattrak : false,
-    };
-    setLoadout((L) => ({
-      ...L,
-      version: 1,
-      weapons: { ...L.weapons, [wId]: { ...cfg, float: clamp(cfg.float, item.min_float, item.max_float) } },
-    }));
-  }
 
-  function updateWeaponConfig(item: SkinCatalogRow, float: number, stattrak: boolean) {
-    const wId = item.weapon.id;
-    setLoadout((L) => ({
-      ...L,
-      version: 1,
-      weapons: {
-        ...L.weapons,
-        [wId]: {
-          skinId: item.id,
-          name: item.name,
-          float: clamp(float, item.min_float, item.max_float),
-          stattrak: item.stattrak ? stattrak : false,
-        },
-      },
-    }));
-  }
-
-  function isSkinEquipped(item: SkinCatalogRow): boolean {
-    const s = loadout.weapons[item.weapon.id];
-    return !!s && s.skinId === item.id;
-  }
-
-  function pickAgent(a: AgentItem) {
-    setLoadout((L) => {
-      const t = a.team?.id;
-      if (t === "counter-terrorists") {
-        return { ...L, version: 1 as const, agent_ct: a.id };
-      }
-      if (t === "terrorists") {
-        return { ...L, version: 1 as const, agent_t: a.id };
-      }
-      return L;
-    });
-  }
-
-  function isAgentEquipped(a: AgentItem): boolean {
-    if (a.team?.id === "counter-terrorists") {
-      return loadout.agent_ct === a.id;
-    }
-    if (a.team?.id === "terrorists") {
-      return loadout.agent_t === a.id;
-    }
-    return false;
-  }
 
   async function createLobby() {
     setErr(null);
@@ -469,284 +295,10 @@ export function HomeApp() {
             <Tabs className="w-full" selectedKey={activeTab} onSelectionChange={(k) => setActiveTab(String(k))}>
               <TabListContainer className="mb-6">
                 <TabList aria-label="Secções do loadout" className="gap-2">
-                  <Tab id="skins" className="px-6 py-2 font-bold uppercase tracking-wider text-xs">Skins</Tab>
-                  <Tab id="agents" className="px-6 py-2 font-bold uppercase tracking-wider text-xs">Agentes</Tab>
-                  <Tab id="music" className="px-6 py-2 font-bold uppercase tracking-wider text-xs">Música</Tab>
                   <Tab id="lobby" className="px-6 py-2 font-bold uppercase tracking-wider text-xs">Lobby</Tab>
                   {isAdmin && <Tab id="server" className="px-6 py-2 font-bold uppercase tracking-wider text-xs">Servidor</Tab>}
                 </TabList>
               </TabListContainer>
-
-              <TabPanel className="pt-4" id="skins">
-              <section>
-                <h2 className="text-sm font-semibold text-foreground-600 mb-3">Armas, facas e luvas</h2>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="w-full sm:max-w-xs">
-                    <Label className="text-xs mb-1">Categoria</Label>
-                    <Select
-                      className="w-full"
-                      selectedKey={skinFilter}
-                      onSelectionChange={(k) => {
-                        setSkinOff(0);
-                        setSkinFilter(String(k));
-                      }}
-                      variant="primary"
-                      fullWidth
-                      aria-label="Categoria de arma"
-                    >
-                      <Select.Trigger>
-                        <Select.Value>{skinFilterLabel}</Select.Value>
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover>
-                        <ListBox>
-                          {SKIN_FILTERS.map((f) => (
-                            <ListBox.Item key={f.id} id={f.id} textValue={f.label}>
-                              {f.label}
-                            </ListBox.Item>
-                          ))}
-                        </ListBox>
-                      </Select.Popover>
-                    </Select>
-                  </div>
-                  <div className="flex-1 min-w-0 max-w-md">
-                    <Label className="text-xs text-foreground-600">Pesquisar</Label>
-                    <TextField
-                      className="mt-1 w-full"
-                      value={skinQ}
-                      onChange={(v) => {
-                        setSkinOff(0);
-                        setSkinQ(v);
-                      }}
-                    >
-                      <Input placeholder="Nome da skin, arma…" />
-                    </TextField>
-                  </div>
-                </div>
-                <AnimatePresence mode="popLayout">
-                  <motion.div 
-                    layout
-                    className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6"
-                  >
-                    {skinItems.map((it, idx) => {
-                      const equipped = isSkinEquipped(it);
-                      const weaponCfg = loadout.weapons[it.weapon.id];
-                      
-                      return (
-                        <motion.div
-                          key={it.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: idx * 0.02 }}
-                          whileHover={{ y: -5 }}
-                        >
-                          <Card
-                            className={`overflow-hidden border border-white/5 h-full transition-colors ${
-                              equipped ? "bg-accent-blue/10 border-accent-blue/30" : "glass bg-white/5"
-                            }`}
-                            variant="default"
-                          >
-                            <div className="relative aspect-[4/3] w-full bg-slate-900/50 group">
-                              {it.image ? (
-                                <Image
-                                  src={it.image}
-                                  alt=""
-                                  fill
-                                  className="object-contain p-4 transition-transform group-hover:scale-110"
-                                  unoptimized={it.image.startsWith("http")}
-                                />
-                              ) : null}
-                              <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-slate-950/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                              
-                              {equipped && (
-                                <div className="absolute left-3 top-3">
-                                  <div className="flex items-center gap-1.5 bg-accent-blue text-[10px] font-black uppercase px-2 py-0.5 rounded shadow-lg">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                                    Equipado
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            <Card.Content className="p-4">
-                              <div className="flex justify-between items-start gap-2 mb-1">
-                                <Card.Title className="line-clamp-1 text-sm font-bold text-slate-100">
-                                  {it.name}
-                                </Card.Title>
-                                {weaponCfg?.stattrak && (
-                                  <span className="text-[10px] font-black text-accent-orange bg-accent-orange/10 px-1.5 rounded border border-accent-orange/20">ST</span>
-                                )}
-                              </div>
-                              <Card.Description className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                {it.weapon.name}
-                              </Card.Description>
-                              
-                              {equipped && (
-                                <div className="mt-3 space-y-1.5">
-                                  <div className="flex justify-between text-[10px] font-medium">
-                                    <span className="text-slate-500 uppercase">Float</span>
-                                    <span className="text-slate-300 tabular-nums">{weaponCfg.float.toFixed(4)}</span>
-                                  </div>
-                                  <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
-                                    <div 
-                                      className="h-full bg-accent-gold" 
-                                      style={{ width: `${(1 - weaponCfg.float) * 100}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </Card.Content>
-                            <Card.Footer className="flex flex-wrap gap-2 p-4 pt-0">
-                              <Button
-                                size="sm"
-                                variant={equipped ? "outline" : "primary"}
-                                className={`flex-1 font-bold ${equipped ? "border-accent-blue/30 text-accent-blue hover:bg-accent-blue/10" : "bg-white text-black"}`}
-                                onPress={() => equipWeaponSkin(it)}
-                              >
-                                {equipped ? "EQUIPADO" : "EQUIPAR"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="font-bold border-white/10 hover:bg-white/5"
-                                isDisabled={!equipped}
-                                onPress={() => equipped && setConfigSkin(it)}
-                              >
-                                CONFIG
-                              </Button>
-                            </Card.Footer>
-                          </Card>
-                        </motion.div>
-                      );
-                    })}
-                  </motion.div>
-                </AnimatePresence>
-                <div className="mt-4 flex items-center gap-2">
-                  <Button size="sm" isDisabled={skinOff < 1} onPress={() => setSkinOff((o) => Math.max(0, o - 48))}>
-                    Anterior
-                  </Button>
-                  <span className="text-sm text-foreground-500">
-                    {skinOff + 1}–{Math.min(skinOff + 48, skinTotal)} de {skinTotal}
-                  </span>
-                  <Button
-                    size="sm"
-                    isDisabled={skinOff + 48 >= skinTotal}
-                    onPress={() => setSkinOff((o) => o + 48)}
-                  >
-                    Seguinte
-                  </Button>
-                </div>
-              </section>
-              </TabPanel>
-
-              <TabPanel className="pt-4" id="agents">
-              <section>
-                <h2 className="text-sm font-semibold text-foreground-600 mb-3">Agentes</h2>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="w-full sm:max-w-xs">
-                    <Label className="text-xs mb-1">Equipa</Label>
-                    <Select
-                      className="w-full"
-                      selectedKey={agentTeam}
-                      onSelectionChange={(k) => setAgentTeam(String(k))}
-                      variant="primary"
-                      fullWidth
-                    >
-                      <Select.Trigger>
-                        <Select.Value>{agentTeamLabel}</Select.Value>
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover>
-                        <ListBox>
-                          {AGENT_TEAMS.map((f) => (
-                            <ListBox.Item key={f.id} id={f.id} textValue={f.label}>
-                              {f.label}
-                            </ListBox.Item>
-                          ))}
-                        </ListBox>
-                      </Select.Popover>
-                    </Select>
-                  </div>
-                  <div className="flex-1 min-w-0 max-w-md">
-                    <Label className="text-xs text-foreground-600">Pesquisar</Label>
-                    <TextField className="mt-1 w-full" value={agentQ} onChange={setAgentQ}>
-                      <Input placeholder="Agente…" />
-                    </TextField>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {agentItems.map((a) => {
-                    const eq = isAgentEquipped(a);
-                    return (
-                      <Card key={a.id} className="overflow-hidden border border-default-200/30">
-                        <div className="relative aspect-[3/4] w-full bg-content2/30">
-                          {a.image ? (
-                            <Image
-                              src={a.image}
-                              alt=""
-                              fill
-                              className="object-contain p-1"
-                              unoptimized={a.image.startsWith("http")}
-                            />
-                          ) : null}
-                          {eq && (
-                            <div className="absolute left-2 top-2">
-                              <Badge size="sm" color="accent">Equipado</Badge>
-                            </div>
-                          )}
-                        </div>
-                        <Card.Content className="p-2">
-                          <p className="line-clamp-2 text-xs font-medium">{a.name}</p>
-                          <p className="text-[10px] text-foreground-500">{a.team?.name}</p>
-                        </Card.Content>
-                        <Card.Footer className="p-2 pt-0">
-                          <Button
-                            size="sm"
-                            className="w-full"
-                            variant={eq ? "secondary" : "primary"}
-                            onPress={() => pickAgent(a)}
-                          >
-                            {eq ? "Selecionado" : "Equipar"}
-                          </Button>
-                        </Card.Footer>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </section>
-              </TabPanel>
-
-              <TabPanel className="pt-4" id="music">
-              <section>
-                <h2 className="text-sm font-semibold text-foreground-600 mb-3">Kit de música</h2>
-                <div className="mb-3 max-w-md">
-                  <Label className="text-xs text-foreground-600">Pesquisar</Label>
-                  <TextField className="mt-1 w-full" value={musicQ} onChange={setMusicQ}>
-                    <Input placeholder="Música…" />
-                  </TextField>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
-                  {musicItems.map((m) => {
-                    const eq = loadout.music === m.id;
-                    return (
-                      <Card key={m.id} className="flex flex-row items-center border border-default-200/30 p-2 gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium line-clamp-1">{m.name}</p>
-                          <p className="text-xs text-foreground-500">{m.id}</p>
-                        </div>
-                        {eq && <Badge size="sm" color="accent">Equipado</Badge>}
-                        <Button
-                          size="sm"
-                          variant={eq ? "secondary" : "primary"}
-                          onPress={() => setLoadout((L) => ({ ...L, version: 1, music: m.id }))}
-                        >
-                          {eq ? "Ativo" : "Equipar"}
-                        </Button>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </section>
-              </TabPanel>
 
               <TabPanel className="pt-4" id="lobby">
                 {activeLobbyCode ? (
@@ -796,16 +348,6 @@ export function HomeApp() {
         </div>
       )}
 
-      <SkinConfigModal
-        item={configSkin}
-        initial={configSkin ? loadout.weapons[configSkin.weapon.id] : undefined}
-        onClose={() => setConfigSkin(null)}
-        onSave={({ float, stattrak }) => {
-          if (configSkin) {
-            updateWeaponConfig(configSkin, float, stattrak);
-          }
-        }}
-      />
     </div>
   );
 }
