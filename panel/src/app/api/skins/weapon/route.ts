@@ -86,12 +86,12 @@ export async function POST(req: NextRequest) {
     [2, 3].forEach(t => {
       tasks.push(savePlayerSkin({ ...row, weapon_team: t as 2 | 3 }));
       if (knifeClassname) tasks.push(savePlayerKnife(session.steamid64, t as 2 | 3, knifeClassname));
-      if (GLOVE_DEFINDEXES.has(defindex)) tasks.push(savePlayerGloves(session.steamid64, t as 2 | 3, defindex));
+      if (GLOVE_DEFINDEXES.has(defindex)) tasks.push(savePlayerGloves(session.steamid64, t as 2 | 3, defindex, paintId, wear, seed));
     });
   } else {
     tasks.push(savePlayerSkin(row));
     if (knifeClassname) tasks.push(savePlayerKnife(session.steamid64, team, knifeClassname));
-    if (GLOVE_DEFINDEXES.has(defindex)) tasks.push(savePlayerGloves(session.steamid64, team, defindex));
+    if (GLOVE_DEFINDEXES.has(defindex)) tasks.push(savePlayerGloves(session.steamid64, team, defindex, paintId, wear, seed));
   }
 
   await Promise.all(tasks);

@@ -1,26 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import * as cat from "@/lib/catalog";
-import { getDataDir } from "@/lib/panel-constants";
+import { NextResponse, type NextRequest } from "next/server";
+import { loadMusicData, filterMusic } from "@/lib/catalog";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
   const q = searchParams.get("q") || "";
-  const offset = Math.max(0, Number.parseInt(searchParams.get("offset") || "0", 10) || 0);
-  const limit = Math.min(120, Math.max(1, Number.parseInt(searchParams.get("limit") || "60", 10) || 60));
+  
+  const dataDir = process.env.PANEL_DATA_DIR || "/data";
   try {
-    const all = await cat.loadMusicData(getDataDir());
-    const filtered = cat.filterMusic(all, q);
-    const total = filtered.length;
-    const slice = cat.paginate(filtered, offset, limit);
-    const items = slice.map((m) => ({
-      id: m.id,
-      name: m.name,
-      image: m.image,
-      def_index: m.def_index,
-    }));
-    return NextResponse.json({ items, total, offset, limit });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg, items: [], total: 0, offset, limit }, { status: 502 });
+    const all = await loadMusicData(dataDir);
+    const filtered = filterMusic(all, q);
+    return NextResponse.json({ items: filtered, total: filtered.length });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

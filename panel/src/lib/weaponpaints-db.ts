@@ -45,6 +45,9 @@ export type WpGloveRow = {
   steamid: string;
   weapon_team: 0 | 2 | 3;
   weapon_defindex: number;
+  weapon_paint_id: number;
+  weapon_wear: number;
+  weapon_seed: number;
 };
 
 export type WpAgentRow = {
@@ -55,7 +58,14 @@ export type WpAgentRow = {
 
 export type WpMusicRow = {
   steamid: string;
+  weapon_team: 0 | 2 | 3;
   music_id: number;
+};
+
+export type WpPinRow = {
+  steamid: string;
+  weapon_team: 0 | 2 | 3;
+  id: number;
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -100,6 +110,26 @@ export async function loadPlayerAgents(steamid: string): Promise<WpAgentRow | nu
   return (rows[0] as WpAgentRow) ?? null;
 }
 
+/** Carrega música de um jogador */
+export async function loadPlayerMusic(steamid: string): Promise<WpMusicRow[]> {
+  const db = getWeaponPaintsDb();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM wp_player_music WHERE steamid = ?",
+    [steamid]
+  );
+  return rows as WpMusicRow[];
+}
+
+/** Carrega pins de um jogador */
+export async function loadPlayerPins(steamid: string): Promise<WpPinRow[]> {
+  const db = getWeaponPaintsDb();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM wp_player_pins WHERE steamid = ?",
+    [steamid]
+  );
+  return rows as WpPinRow[];
+}
+
 /** Salva/atualiza uma skin */
 export async function savePlayerSkin(row: WpSkinRow): Promise<void> {
   const db = getWeaponPaintsDb();
@@ -135,13 +165,17 @@ export async function savePlayerKnife(steamid: string, team: 0 | 2 | 3, knife: s
 }
 
 /** Salva/atualiza luvas */
-export async function savePlayerGloves(steamid: string, team: 0 | 2 | 3, defindex: number): Promise<void> {
+export async function savePlayerGloves(steamid: string, team: 0 | 2 | 3, defindex: number, paintId: number = 0, wear: number = 0, seed: number = 0): Promise<void> {
   const db = getWeaponPaintsDb();
   await db.execute(
-    `INSERT INTO wp_player_gloves (steamid, weapon_team, weapon_defindex)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE weapon_defindex = VALUES(weapon_defindex)`,
-    [steamid, team, defindex]
+    `INSERT INTO wp_player_gloves (steamid, weapon_team, weapon_defindex, weapon_paint_id, weapon_wear, weapon_seed)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE 
+       weapon_defindex = VALUES(weapon_defindex),
+       weapon_paint_id = VALUES(weapon_paint_id),
+       weapon_wear = VALUES(weapon_wear),
+       weapon_seed = VALUES(weapon_seed)`,
+    [steamid, team, defindex, paintId, wear, seed]
   );
 }
 
@@ -153,6 +187,28 @@ export async function savePlayerAgents(steamid: string, agent_ct: string | null,
      VALUES (?, ?, ?)
      ON DUPLICATE KEY UPDATE agent_ct = VALUES(agent_ct), agent_t = VALUES(agent_t)`,
     [steamid, agent_ct, agent_t]
+  );
+}
+
+/** Salva/atualiza música */
+export async function savePlayerMusic(steamid: string, team: 0 | 2 | 3, music_id: number): Promise<void> {
+  const db = getWeaponPaintsDb();
+  await db.execute(
+    `INSERT INTO wp_player_music (steamid, weapon_team, music_id)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE music_id = VALUES(music_id)`,
+    [steamid, team, music_id]
+  );
+}
+
+/** Salva/atualiza pin */
+export async function savePlayerPin(steamid: string, team: 0 | 2 | 3, pin_id: number): Promise<void> {
+  const db = getWeaponPaintsDb();
+  await db.execute(
+    `INSERT INTO wp_player_pins (steamid, weapon_team, id)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE id = VALUES(id)`,
+    [steamid, team, pin_id]
   );
 }
 

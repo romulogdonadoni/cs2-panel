@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
   const steamid = session.steamid64;
   const tasks: Promise<void>[] = [];
 
-  // Faca CT (team 1)
+  // Faca CT (team 3)
   if (typeof body.knife_ct === "string" && body.knife_ct) {
-    tasks.push(savePlayerKnife(steamid, 1, body.knife_ct));
+    tasks.push(savePlayerKnife(steamid, 3, body.knife_ct));
   }
   // Faca T (team 2)
   if (typeof body.knife_t === "string" && body.knife_t) {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   }
   // Luva CT
   if (typeof body.glove_ct === "number" && body.glove_ct > 0) {
-    tasks.push(savePlayerGloves(steamid, 1, body.glove_ct));
+    tasks.push(savePlayerGloves(steamid, 3, body.glove_ct));
   }
   // Luva T
   if (typeof body.glove_t === "number" && body.glove_t > 0) {

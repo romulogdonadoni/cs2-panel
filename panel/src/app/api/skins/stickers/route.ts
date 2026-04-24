@@ -9,7 +9,7 @@
  * Body:
  * {
  *   weapon_defindex: number,
- *   weapon_team: 0|1|2,           // default 0
+ *   weapon_team: 0|2|3,           // default 0
  *   stickers?: (number|null)[],   // array de 5 itens (null = vazio)
  *   keychain?: number | null      // def_index do keychain, null = remover
  * }
@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getWeaponPaintsDb } from "@/lib/weaponpaints-db";
+import { loadStickersData, loadKeychainsData } from "@/lib/catalog";
 
 const EMPTY_STICKER = "0;0;0;0;0;0;0";
 const EMPTY_KEYCHAIN = "0;0;0;0;0";
@@ -45,14 +46,20 @@ export async function POST(req: NextRequest) {
   const defindex     = Number(body.weapon_defindex);
   const team         = Number(body.weapon_team ?? 0);
 
+  console.log(`[API/STICKERS] SteamID: ${steamid}, Def: ${defindex}, Team: ${team}`);
+
   if (!defindex) return NextResponse.json({ error: "weapon_defindex required" }, { status: 400 });
 
   const db = getWeaponPaintsDb();
 
-  // Verifica se a skin já está salva (precisa existir para atualizar stickers)
-  const [rows] = await db.execute(
-    "SELECT weapon_stattrak, weapon_wear, weapon_paint_id, weapon_seed, weapon_nametag, weapon_stattrak_count FROM wp_player_skins WHERE steamid=? AND weapon_team=? AND weapon_defindex=?",
-    [steamid, team, defindex]
+  // Se for Ambos (0), vamos aplicar para 2 (T) e 3 (CT)
+  const teamsToUpdate = team === 0 ? [2, 3] : [team];
+
+  // Verifica se a skin já está salva em pelo menos um dos times alvo
+  // Usamos query em vez de execute para suporte correto ao IN (?) com array
+  const [rows] = await db.query(
+    "SELECT weapon_team FROM wp_player_skins WHERE steamid=? AND weapon_team IN (?) AND weapon_defindex=?",
+    [steamid, teamsToUpdate, defindex]
   ) as [Record<string, unknown>[], unknown];
 
   if (!rows.length) {
@@ -84,11 +91,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, message: "nothing to update" });
   }
 
-  params.push(steamid, String(team), String(defindex));
-  await db.execute(
-    `UPDATE wp_player_skins SET ${updates.join(", ")} WHERE steamid=? AND weapon_team=? AND weapon_defindex=?`,
-    params
-  );
+  // Executa o update para cada time necessário
+  const tasks = teamsToUpdate.map(t => {
+    const finalParams = [...params, steamid, String(t), String(defindex)];
+    return db.execute(
+      `UPDATE wp_player_skins SET ${updates.join(", ")} WHERE steamid=? AND weapon_team=? AND weapon_defindex=?`,
+      finalParams
+    );
+  });
+
+  await Promise.all(tasks);
 
   return NextResponse.json({ ok: true });
 }
@@ -106,9 +118,11 @@ export async function GET(req: NextRequest) {
   if (!defindex) return NextResponse.json({ error: "weapon_defindex required" }, { status: 400 });
 
   const db = getWeaponPaintsDb();
-  const [rows] = await db.execute(
-    "SELECT weapon_sticker_0, weapon_sticker_1, weapon_sticker_2, weapon_sticker_3, weapon_sticker_4, weapon_keychain FROM wp_player_skins WHERE steamid=? AND weapon_team=? AND weapon_defindex=?",
-    [session.steamid64, team, defindex]
+  const teamsToCheck = team === 0 ? [2, 3] : [team];
+
+  const [rows] = await db.query(
+    "SELECT weapon_sticker_0, weapon_sticker_1, weapon_sticker_2, weapon_sticker_3, weapon_sticker_4, weapon_keychain FROM wp_player_skins WHERE steamid=? AND weapon_team IN (?) AND weapon_defindex=? LIMIT 1",
+    [session.steamid64, teamsToCheck, defindex]
   ) as [Record<string, string>[], unknown];
 
   if (!rows.length) return NextResponse.json({ stickers: [null,null,null,null,null], keychain: null });
@@ -139,10 +153,23 @@ export async function GET(req: NextRequest) {
     parseStickerStr(r.weapon_sticker_4 ?? "0"),
   ];
 
+  // Carrega catálogos para enriquecer a resposta
+  const dataDir = process.env.PANEL_DATA_DIR || "/data";
+  const [allStickers, allKeychains] = await Promise.all([
+    loadStickersData(dataDir).catch(() => []),
+    loadKeychainsData(dataDir).catch(() => []),
+  ]);
+
+  const stickerInfo = stickers.map(s => {
+    if (!s.id) return null;
+    const item = allStickers.find(x => x.def_index === String(s.id));
+    return item ? { id: s.id, name: item.name, image: item.image, rarity: item.rarity, wear: s.wear } : { id: s.id, wear: s.wear };
+  });
+
+  const keychainInfo = kc.id ? allKeychains.find(x => x.def_index === String(kc.id)) : null;
+
   return NextResponse.json({
-    stickers: stickers.map(s => s.id),
-    sticker_wear: stickers.map(s => s.wear),
-    keychain: kc.id,
-    keychain_seed: kc.seed,
+    stickers: stickerInfo,
+    keychain: keychainInfo ? { id: kc.id, name: keychainInfo.name, image: keychainInfo.image, rarity: keychainInfo.rarity, seed: kc.seed } : (kc.id ? { id: kc.id, seed: kc.seed } : null),
   });
 }

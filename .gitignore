@@ -1,3 +1,4 @@
+.cursor/
 node_modules
 .next
 out
@@ -6,6 +7,7 @@ dist
 *.log
 panel.db
 panel.db-journal
+panel/**/dev.db
 .env
 data/
 cs2-data/

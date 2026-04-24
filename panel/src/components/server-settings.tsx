@@ -18,7 +18,7 @@ export function ServerSettings() {
           setEnv(j.env);
         }
       } catch (e) {
-        setErr("Falha ao carregar definições");
+        setErr("Falha ao carregar configurações");
       } finally {
         setLoading(false);
       }
@@ -36,7 +36,7 @@ export function ServerSettings() {
       });
       if (!r.ok) {
         const j = await r.json();
-        setErr(j.error || "Erro ao guardar");
+        setErr(j.error || "Erro ao salvar");
       }
     } catch (e) {
       setErr("Erro de rede");
@@ -45,7 +45,7 @@ export function ServerSettings() {
     }
   };
 
-  if (loading) return <div className="text-slate-500 p-4">A carregar definições...</div>;
+  if (loading) return <div className="text-slate-500 p-4">Carregando configurações…</div>;
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -101,9 +101,9 @@ export function ServerSettings() {
         isDisabled={saving}
         onPress={update}
       >
-        {saving ? "A GUARDAR..." : "APLICAR ALTERAÇÕES"}
+        {saving ? "SALVANDO…" : "APLICAR ALTERAÇÕES"}
       </Button>
-      <p className="text-[10px] text-slate-500 italic">Nota: Algumas alterações podem exigir o reinício do servidor Docker.</p>
+      <p className="text-[10px] text-slate-500 italic">Algumas alterações podem exigir reinício do processo de jogo no anfitrião.</p>
     </div>
   );
 }

@@ -75,22 +75,31 @@ export class RconClient {
   }
 }
 
-export async function sendRconCommand(command: string): Promise<string> {
+export async function sendRconCommand(command: string, retries = 3): Promise<string> {
   const host = process.env.CS2_HOST || "127.0.0.1";
   const port = parseInt(process.env.CS2_PORT || "27015", 10);
   const password = process.env.CS2_RCONPW || "changeme";
 
   console.log(`[RCON] Enviar comando para ${host}:${port}: ${command}`);
-  const client = new RconClient(host, port, password);
-  try {
-    await client.connect();
-    const res = await client.exec(command);
-    console.log(`[RCON] Resposta: ${res || "(vazio)"}`);
-    return res;
-  } catch (err) {
-    console.error(`[RCON] Erro:`, err);
-    throw err;
-  } finally {
-    client.destroy();
+  
+  let lastErr: any;
+  for (let i = 0; i < retries; i++) {
+    const client = new RconClient(host, port, password);
+    try {
+      await client.connect();
+      const res = await client.exec(command);
+      console.log(`[RCON] Resposta: ${res || "(vazio)"}`);
+      return res;
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[RCON] Tentativa ${i + 1} falhou:`, err instanceof Error ? err.message : err);
+      if (i < retries - 1) {
+        await new Promise(r => setTimeout(r, 2000)); // Espera 2s antes de tentar de novo
+      }
+    } finally {
+      client.destroy();
+    }
   }
+  
+  throw lastErr;
 }

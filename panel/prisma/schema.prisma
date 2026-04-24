@@ -15,6 +15,18 @@ model Loadout {
   @@map("loadouts")
 }
 
+model User {
+  steamid64 String   @id
+  name      String
+  avatar    String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  lobbyMembers LobbyMember[]
+
+  @@map("users")
+}
+
 model Lobby {
   id              String        @id @default(uuid())
   code            String        @unique
@@ -43,6 +55,7 @@ model LobbyMember {
   isLeader  Boolean  @default(false) @map("is_leader")
   joinedAt  DateTime @default(now()) @map("joined_at")
   lobby     Lobby    @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [steamid64], references: [steamid64], onDelete: Cascade)
 
   @@id([lobbyId, steamid64])
   @@map("lobby_members")

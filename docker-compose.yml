@@ -9,7 +9,9 @@ services:
       - STEAMAPPVALIDATE=${STEAMAPPVALIDATE:-0}
       - SRCDS_TOKEN=${SRCDS_TOKEN:?set in .env}
       - CS2_SERVERNAME=${CS2_SERVERNAME:-changeme}
-      - CS2_STARTMAP=${CS2_STARTMAP:-de_dust2}
+      # Não colocar -authkey em CS2_STARTMAP (quebra o nome do mapa e o download do workshop).
+      - CS2_STARTMAP=${CS2_STARTMAP:-de_mirage}
+      - CS2_ADDITIONAL_ARGS=-authkey ${STEAM_WEB_API_KEY}
       - CS2_MAPGROUP=${CS2_MAPGROUP:-mg_active}
       - CS2_GAMETYPE=${CS2_GAMETYPE:-0}
       - CS2_GAMEMODE=${CS2_GAMEMODE:-1}
@@ -37,6 +39,9 @@ services:
       - PANEL_DATA_DIR=/data
       - PANEL_COMPOSE_DIR=/project
       - DATABASE_URL=file:/data/panel.db
+      - MATCHZY_WEBHOOK_SECRET=${MATCHZY_WEBHOOK_SECRET:-}
+      # Opcional: FACEIT (developers.faceit.com; conta com email + MFA) — Elo/level CS2 no lobby
+      - FACEIT_API_KEY=${FACEIT_API_KEY:-}
     volumes:
       - .:/project
       - panel-data:/data

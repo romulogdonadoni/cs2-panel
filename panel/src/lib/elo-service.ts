@@ -29,7 +29,7 @@ export async function calculateElo(
   });
 
   const ratingMap = new Map<string, number>(
-    existing.map((r) => [r.steamid64, r.elo] as [string, number])
+    existing.map((r: any) => [r.steamid64, r.elo] as [string, number])
   );
 
   // Default de 1000 para novatos

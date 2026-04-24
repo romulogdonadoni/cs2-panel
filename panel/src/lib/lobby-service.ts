@@ -1,7 +1,9 @@
 import { randomBytes } from "node:crypto";
-import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { defaultSettings, parseSettings, type LobbySettings } from "./lobby-types";
+
+/** Uma linha lógica: um servidor = uma sala, sempre a mesma no painel. */
+export const SINGLETON_LOBBY_CODE = "GLOBAL";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -21,8 +23,8 @@ async function touchLobby(lobbyId: string) {
   });
 }
 
-function isP2002(e: unknown): boolean {
-  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+function isP2002(e: any): boolean {
+  return e?.code === "P2002";
 }
 
 export async function createLobby(
@@ -34,7 +36,14 @@ export async function createLobby(
     const id = crypto.randomUUID();
     const settings = JSON.stringify(defaultSettings());
     try {
-      return await prisma.$transaction(async (tx) => {
+      return await prisma.$transaction(async (tx: any) => {
+        // Garantir que o user existe para evitar P2003 (Foreign Key)
+        await tx.user.upsert({
+          where: { steamid64: leader },
+          update: {},
+          create: { steamid64: leader, name: `User_${leader.slice(-5)}`, avatar: "" }
+        });
+
         const lobby = await tx.lobby.create({
           data: {
             id,
@@ -47,7 +56,7 @@ export async function createLobby(
             members: {
               create: {
                 steamid64: leader,
-                team: 0,
+                team: 3, // Inicia como Espectador (Unassigned)
                 isReady: false,
                 isLeader: true,
               },
@@ -70,14 +79,14 @@ export async function createLobby(
 export function getLobbyByCodeRaw(code: string) {
   return prisma.lobby.findUnique({
     where: { code: code.toUpperCase() },
-    include: { members: { orderBy: { joinedAt: "asc" } } },
+    include: { members: { orderBy: { joinedAt: "asc" }, include: { user: true } } },
   });
 }
 
 export function getLobbyById(lobbyId: string) {
   return prisma.lobby.findUnique({
     where: { id: lobbyId },
-    include: { members: { orderBy: { joinedAt: "asc" } } },
+    include: { members: { orderBy: { joinedAt: "asc" }, include: { user: true } } },
   });
 }
 
@@ -100,9 +109,67 @@ export async function joinLobby(lobbyId: string, steamid64: string) {
     return;
   }
   await prisma.lobbyMember.create({
-    data: { lobbyId, steamid64, team: 0, isReady: false, isLeader: false },
+    data: { lobbyId, steamid64, team: 3, isReady: false, isLeader: false },
   });
   await touchLobby(lobbyId);
+}
+
+/**
+ * Garante a existência da sala única e adiciona o utilizador como membro. Idempotente.
+ * Um VM / um servidor = uma sala; o estado "partida activa" é `lobby.status === "live"`.
+ */
+export async function ensureSingletonLobby(steamid64: string) {
+  await prisma.user.upsert({
+    where: { steamid64 },
+    update: {},
+    create: { steamid64, name: `User_${steamid64.slice(-5)}`, avatar: "" },
+  });
+
+  let lobby = await getLobbyByCodeRaw(SINGLETON_LOBBY_CODE);
+  if (!lobby) {
+    const settings = JSON.stringify(defaultSettings());
+    const id = crypto.randomUUID();
+    try {
+      lobby = await prisma.lobby.create({
+        data: {
+          id,
+          code: SINGLETON_LOBBY_CODE,
+          leaderSteamid64: steamid64,
+          team1Name: "Time 1",
+          team2Name: "Time 2",
+          mapId: "de_mirage",
+          settingsJson: settings,
+          members: {
+            create: {
+              steamid64,
+              team: 3,
+              isReady: false,
+              isLeader: true,
+            },
+          },
+        },
+        include: { members: { orderBy: { joinedAt: "asc" }, include: { user: true } } },
+      });
+    } catch (e) {
+      if (isP2002(e)) {
+        lobby = await getLobbyByCodeRaw(SINGLETON_LOBBY_CODE);
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  if (!lobby) {
+    throw new Error("Não foi possível criar a sala");
+  }
+
+  if (!(await isMember(lobby.id, steamid64))) {
+    await joinLobby(lobby.id, steamid64);
+  }
+
+  const out = await getLobbyByCodeRaw(SINGLETON_LOBBY_CODE);
+  if (!out) throw new Error("sala inesperadamente inexistente");
+  return out;
 }
 
 export async function leaveLobby(lobbyId: string, steamid64: string) {
@@ -190,7 +257,7 @@ export async function updateLobbyLeader(
       maxPerTeam: max,
       settingsJson: JSON.stringify(s),
     },
-    include: { members: { orderBy: { joinedAt: "asc" } } },
+    include: { members: { orderBy: { joinedAt: "asc" }, include: { user: true } } },
   });
 }
 
@@ -201,23 +268,66 @@ export async function deleteLobby(lobby: LobbyWithMembers, leader: string) {
   await prisma.lobby.delete({ where: { id: lobby.id } });
 }
 
-export async function startMatch(lobby: LobbyWithMembers, leader: string) {
+export type StartMatchResult =
+  | { kind: "already_live"; lobby: LobbyWithMembers }
+  | { kind: "started"; lobby: LobbyWithMembers };
+
+/**
+ * Põe o lobby em "live" e devolve o estado atual. Idempotente: se já estava "live",
+ * não reenvia a partida (evita 2.º `matchzy_loadmatch` a cancelar o download do workshop).
+ * Usa `updateMany` (open → live) para evitar duplo POST em paralelo a disparar o servidor 2x.
+ */
+export async function startMatch(lobby: LobbyWithMembers, leader: string): Promise<StartMatchResult> {
   if (lobby.leaderSteamid64 !== leader) {
     throw new Error("só o líder");
   }
-  
-  const playing = lobby.members.filter(m => m.team === 1 || m.team === 2);
-  const notReady = playing.filter(m => !m.isReady);
-  
+
+  if (lobby.status === "live") {
+    return { kind: "already_live", lobby };
+  }
+
+  const playing = lobby.members.filter((m: any) => m.team === 1 || m.team === 2);
+  const notReady = playing.filter((m: any) => !m.isReady);
+
   if (notReady.length > 0) {
     throw new Error("nem todos os jogadores estão prontos");
   }
 
-  return prisma.lobby.update({
-    where: { id: lobby.id },
+  const n = await prisma.lobby.updateMany({
+    where: { id: lobby.id, status: "open" },
     data: { status: "live" },
-    include: { members: { orderBy: { joinedAt: "asc" } } },
   });
+
+  if (n.count > 0) {
+    const updated = await getLobbyByCodeRaw(lobby.code);
+    if (!updated) throw new Error("lobby não encontrada");
+    return { kind: "started", lobby: updated };
+  }
+
+  const again = await getLobbyByCodeRaw(lobby.code);
+  if (again && again.status === "live") {
+    return { kind: "already_live", lobby: again };
+  }
+  throw new Error("não foi possível iniciar o lobby (estado inesperado)");
+}
+
+/**
+ * Após o MatchZy receber `css_endmatch` no servidor: lobby volta a "open" e partidas abertas a "cancelled".
+ */
+export async function cancelLiveLobby(lobby: LobbyWithMembers) {
+  await prisma.$transaction([
+    prisma.match.updateMany({
+      where: { lobbyId: lobby.id, status: { in: ["warmup", "live"] } },
+      data: { status: "cancelled", endedAt: new Date() },
+    }),
+    prisma.lobby.update({
+      where: { id: lobby.id },
+      data: { status: "open" },
+    }),
+  ]);
+  const reloaded = await getLobbyByCodeRaw(lobby.code);
+  if (!reloaded) throw new Error("lobby não encontrada");
+  return reloaded;
 }
 
 export async function getPublicIp(): Promise<string> {

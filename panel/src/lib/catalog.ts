@@ -11,6 +11,8 @@ const STICKERS_URL =
   "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/stickers.json";
 const KEYCHAINS_URL =
   "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/keychains.json";
+const PINS_URL =
+  "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/collectibles.json";
 
 const CAT = {
   gloves: "sfui_invpanel_filter_gloves",
@@ -162,6 +164,18 @@ export async function loadAgentsData(dataDir: string): Promise<AgentRow[]> {
     throw new Error(`HTTP ${r.status} agents`);
   }
   const arr = (await r.json()) as AgentRow[];
+  
+  // O plugin WeaponPaints adiciona "agents/models/" e ".vmdl" automaticamente no código C# dele
+  // Portanto, precisamos salvar no banco APENAS o caminho interno.
+  arr.forEach(agent => {
+    if (agent.model_player) {
+      agent.model_player = agent.model_player
+        .replace("agents/models/", "")
+        .replace("characters/models/", "")
+        .replace(".vmdl", "");
+    }
+  });
+  
   agentsInMemory = arr;
   writeCacheJson(p, arr);
   return arr;
@@ -320,4 +334,37 @@ export function filterKeychains(list: KeychainRow[], q: string): KeychainRow[] {
   const qn = (q || "").trim().toLowerCase();
   if (!qn) return list;
   return list.filter(k => k.name.toLowerCase().includes(qn));
+}
+
+// ─── Pins ──────────────────────────────────────────────────────────────────────
+
+export type PinRow = {
+  id: string;
+  name: string;
+  image: string;
+  def_index: string;
+  rarity?: { name: string; color: string };
+};
+
+let pinsInMemory: PinRow[] | null = null;
+
+export async function loadPinsData(dataDir: string): Promise<PinRow[]> {
+  if (pinsInMemory) return pinsInMemory;
+  const p = cachePath(dataDir, "pins.json");
+  if (isCacheFresh(p)) {
+    const j = readCachedJson<PinRow[]>(p);
+    if (j && j.length) { pinsInMemory = j; return j; }
+  }
+  const r = await fetch(PINS_URL, { signal: AbortSignal.timeout(60_000) });
+  if (!r.ok) throw new Error(`HTTP ${r.status} pins`);
+  const arr = (await r.json()) as PinRow[];
+  pinsInMemory = arr;
+  writeCacheJson(p, arr);
+  return arr;
+}
+
+export function filterPins(list: PinRow[], q: string): PinRow[] {
+  const qn = (q || "").trim().toLowerCase();
+  if (!qn) return list;
+  return list.filter(p => p.name.toLowerCase().includes(qn));
 }

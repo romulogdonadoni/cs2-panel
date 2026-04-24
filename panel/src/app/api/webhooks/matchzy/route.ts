@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { calculateElo } from "@/lib/elo-service";
+import { ingestMatchZyEventBody } from "@/lib/matchzy-ingest";
+import { matchzyWebhookAuthOk } from "@/lib/matchzy-webhook-auth";
 
-// MatchZy envia um POST aqui ao final da partida
-// Docs: https://github.com/shobhit-pathak/MatchZy/blob/master/README.md#webhooks
+// Formato event + OpenAPI: https://shobhit-pathak.github.io/MatchZy/events.html
+// match_end_url no JSON da partida pode ainda apontar aqui (legado) ou para /api/webhooks/matchzy-events
 export async function POST(request: Request) {
-  // Valida o secret configurado no MatchZy config.cfg
-  const secret = request.headers.get("x-matchzy-secret");
-  if (secret !== "matchzy-pug-secret") {
+  if (!matchzyWebhookAuthOk(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -18,7 +18,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  const matchId: string = body.matchid;
+  if (body && typeof body === "object" && body.event) {
+    try {
+      await ingestMatchZyEventBody(body);
+    } catch (e) {
+      console.error("[webhooks/matchzy]", e);
+      return NextResponse.json({ error: "processing failed" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Legado: player_stats a nível de raiz (não usado por MatchZy OpenAPI)
+  const matchId: string = String(body.matchid || "");
   if (!matchId) {
     return NextResponse.json({ error: "missing matchid" }, { status: 400 });
   }
@@ -33,12 +44,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, reason: "match not found" });
   }
 
-  // Extrair placar do payload do MatchZy
   const score1: number = body.team1?.score ?? 0;
   const score2: number = body.team2?.score ?? 0;
   const winner = score1 > score2 ? 1 : score2 > score1 ? 2 : null;
 
-  // Extrair stats por jogador
   const playerStats: Record<string, { kills: number; deaths: number; assists: number; adr: number }> = {};
   for (const [steamid, stats] of Object.entries(body.player_stats ?? {})) {
     const s = stats as any;
@@ -50,7 +59,6 @@ export async function POST(request: Request) {
     };
   }
 
-  // Atualizar match no banco
   await prisma.match.update({
     where: { id: match.id },
     data: {
@@ -63,7 +71,6 @@ export async function POST(request: Request) {
     },
   });
 
-  // Atualizar stats de cada jogador
   for (const player of match.players) {
     const stats = playerStats[player.steamid64];
     if (stats) {
@@ -74,16 +81,14 @@ export async function POST(request: Request) {
     }
   }
 
-  // Atualizar lobby para status "open" novamente
   await prisma.lobby.update({
     where: { id: match.lobbyId },
     data: { status: "open" },
   });
 
-  // Calcular e atualizar ELO
   if (winner !== null) {
-    const team1 = match.players.filter((p) => p.team === 1).map((p) => p.steamid64);
-    const team2 = match.players.filter((p) => p.team === 2).map((p) => p.steamid64);
+    const team1 = match.players.filter((p: { team: number }) => p.team === 1).map((p: { steamid64: string }) => p.steamid64);
+    const team2 = match.players.filter((p: { team: number }) => p.team === 2).map((p: { steamid64: string }) => p.steamid64);
     await calculateElo(team1, team2, winner);
   }
 

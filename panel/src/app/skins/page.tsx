@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { SkinConfigModal, type SkinCatalogRow } from "@/components/skin-config-modal";
 import { StickerKeychainModal } from "@/components/sticker-keychain-modal";
+import { RemoteInventoryImage } from "@/components/remote-inventory-image";
 import { clamp } from "@/lib/loadout-types";
 
 // ── defindex map ───────────────────────────────────────────────────────────────
@@ -28,9 +29,9 @@ const DEFINDEX: Record<string, number> = {
   "knife_widowmaker":523, "knife_skeleton":525,
   "knife_kukri":526, "knife_classic":503, "knife_css":503,
   "leather_handwraps":5032, "sport_gloves":5030,
-  "motorcycle_gloves":5035, "specialist_gloves":5031,
-  "driver_gloves":5033, "hydra_gloves":5034,
-  "brokenfang_gloves":5033, "bloodhound_gloves":5033,
+  "motorcycle_gloves":5033, "specialist_gloves":5034,
+  "driver_gloves":5031, "hydra_gloves":5035,
+  "brokenfang_gloves":4725, "bloodhound_gloves":5027,
 };
 
 const GLOVES = new Set([4725, 5027, 5030, 5031, 5032, 5033, 5034, 5035]);
@@ -47,12 +48,16 @@ const RARITY: Record<string,string> = {
 };
 
 const CATEGORIES = [
-  {id:"all",label:"Tudo",icon:"◈"},{id:"knife",label:"Facas",icon:"🗡"},
+  {id:"loadout",label:"Loadout",icon:"◈"},{id:"knife",label:"Facas",icon:"🗡"},
   {id:"gloves",label:"Luvas",icon:"🧤"},{id:"agents",label:"Agentes",icon:"🧑"},
   {id:"rifle",label:"Rifles",icon:"🎯"},{id:"sniper",label:"Sniper",icon:"🔭"},
   {id:"pistol",label:"Pistolas",icon:"🔫"},{id:"smg",label:"SMG",icon:"⚡"},
   {id:"shotgun",label:"Shotgun",icon:"💥"},{id:"heavy",label:"Pesado",icon:"🛡"},
+  {id:"music",label:"Músicas",icon:"🎵"},{id:"pins",label:"Pins",icon:"🏅"},
 ];
+
+type Music = { id: number; name: string; image: string; team?: 0 | 2 | 3 };
+type Pin = { id: number; name: string; image: string; team?: 0 | 2 | 3 };
 
 type Agent = { id:string; name:string; image:string; def_index:string; model_player:string|null; team:{id:string;name:string}; rarity:{name:string;color:string}; };
 
@@ -64,14 +69,14 @@ const key = (def:number, paint:number) => `${def}:${paint}`;
 export default function SkinsPage() {
   const [skins,setSkins]         = useState<Skin[]>([]);
   const [total,setTotal]         = useState(0);
-  const [cat,setCat]             = useState("all");
+  const [cat,setCat]             = useState("loadout");
   const [team,setTeam]           = useState<"all"|"ct"|"t">("all");
   const [query,setQuery]         = useState("");
   const [offset,setOffset]       = useState(0);
   const [loading,setLoading]     = useState(false);
   const [busyKey,setBusyKey]     = useState<string|null>(null);
   const [saved,setSaved]         = useState<Record<string,Saved>>({});
-  const [activeByDef,setActive]  = useState<Record<number,number>>({});
+  const [activeByDef,setActive]  = useState<Record<number, Record<number, number>>>({}); // defindex -> { team: paint }
   const [selected,setSelected]   = useState<Skin|null>(null);
   const [toast,setToast]         = useState<{msg:string;ok:boolean}|null>(null);
   const [collapsed,setCollapsed] = useState<Record<string,boolean>>({});
@@ -85,17 +90,49 @@ export default function SkinsPage() {
   const [savingAgent,setSavingAgent] = useState<string|null>(null);
   // Stickers/Keychain
   const [stickerTarget,setStickerTarget] = useState<{defindex:number;name:string}|null>(null);
+  // Music & Pins
+  const [musics, setMusics] = useState<Music[]>([]);
+  const [pins, setPins] = useState<Pin[]>([]);
+  const [musicCt, setMusicCt] = useState<Music | null>(null);
+  const [musicT, setMusicT] = useState<Music | null>(null);
+  const [pinCt, setPinCt] = useState<Pin | null>(null);
+  const [pinT, setPinT] = useState<Pin | null>(null);
+  const [savingMusic, setSavingMusic] = useState<number | null>(null);
+  const [savingPin, setSavingPin] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>|null>(null);
   const LIMIT = 5000;
 
   useEffect(()=>{
     fetch("/api/skins").then(r=>r.json()).then(d=>{
       if(!d.skins) return;
-      const m:Record<string,Saved>={}, bd:Record<number,number>={};
-      for(const s of d.skins as Saved[]){ m[key(s.weapon_defindex,s.weapon_paint_id)]=s; bd[s.weapon_defindex]=s.weapon_paint_id; }
+      const m:Record<string,Saved>={}, bd:Record<number, Record<number, number>>={};
+      for(const s of d.skins as Saved[]){
+        m[key(s.weapon_defindex,s.weapon_paint_id)]=s;
+        if(!bd[s.weapon_defindex]) bd[s.weapon_defindex] = {};
+        bd[s.weapon_defindex][s.weapon_team] = s.weapon_paint_id;
+      }
       setSaved(m); setActive(bd);
       // Carrega agentes salvos
       if(d.agents){ /* agentCt/T são def_index como string */ }
+    }).catch(()=>{});
+
+    // Carrega músicas e pins salvos
+    fetch("/api/skins/music").then(r=>r.json()).then(d=>{
+      if(d.music){
+        d.music.forEach((m:any)=>{
+          if(m.team===2) setMusicT(m);
+          if(m.team===3) setMusicCt(m);
+        });
+      }
+    }).catch(()=>{});
+
+    fetch("/api/skins/pins").then(r=>r.json()).then(d=>{
+      if(d.pins){
+        d.pins.forEach((p:any)=>{
+          if(p.team===2) setPinT(p);
+          if(p.team===3) setPinCt(p);
+        });
+      }
     }).catch(()=>{});
   },[]);
 
@@ -118,8 +155,19 @@ export default function SkinsPage() {
       showToast(`Agente sem model path — não suportado pelo WeaponPaints`,false);
       return;
     }
+    const isCt = agent.team?.id?.includes("counter");
+    if (side === "ct" && !isCt) {
+      showToast(`Não é possível equipar um agente TR na equipe CT.`, false);
+      return;
+    }
+    if (side === "t" && isCt) {
+      showToast(`Não é possível equipar um agente CT na equipe TR.`, false);
+      return;
+    }
     try{
-      const body = side==="ct" ? {agent_ct:modelPath} : {agent_t:modelPath};
+      let formattedPath = modelPath.replace(/^(agents|characters)\/models\//, "");
+      formattedPath = formattedPath.replace(/\.vmdl$/, "");
+      const body = side==="ct" ? {agent_ct:formattedPath} : {agent_t:formattedPath};
       const r=await fetch("/api/skins/agents",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       if(!r.ok) throw new Error();
       if(side==="ct") setAgentCt(agent); else setAgentT(agent);
@@ -136,8 +184,52 @@ export default function SkinsPage() {
     }catch{showToast("Falha",false);}
   };
 
+  const fetchMusic = useCallback(async(q:string)=>{
+    setLoading(true);
+    try{
+      const d = await fetch(`/api/catalog/music?q=${q}`).then(r=>r.json());
+      setMusics(d.items ?? []);
+    }finally{setLoading(false);}
+  },[]);
+
+  const fetchPins = useCallback(async(q:string)=>{
+    setLoading(true);
+    try{
+      const d = await fetch(`/api/catalog/pins?q=${q}`).then(r=>r.json());
+      setPins(d.items ?? []);
+    }finally{setLoading(false);}
+  },[]);
+
+  const saveMusic = async(m:Music)=>{
+    setSavingMusic(m.id);
+    try{
+      const tNum = team === "all" ? 0 : (team === "ct" ? 3 : 2);
+      const r = await fetch("/api/skins/music",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({music_id:m.id, weapon_team:tNum})});
+      if(!r.ok) throw new Error();
+      if(tNum===0||tNum===3) setMusicCt(m);
+      if(tNum===0||tNum===2) setMusicT(m);
+      showToast(`Música ${m.name} salva! !wp no jogo.`,true);
+    }catch{showToast("Falha ao salvar música",false);}
+    finally{setSavingMusic(null);}
+  };
+
+  const savePin = async(p:Pin)=>{
+    setSavingPin(p.id);
+    try{
+      const tNum = team === "all" ? 0 : (team === "ct" ? 3 : 2);
+      const r = await fetch("/api/skins/pins",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin_id:p.id, weapon_team:tNum})});
+      if(!r.ok) throw new Error();
+      if(tNum===0||tNum===3) setPinCt(p);
+      if(tNum===0||tNum===2) setPinT(p);
+      showToast(`Pin ${p.name} salvo! !wp no jogo.`,true);
+    }catch{showToast("Falha ao salvar pin",false);}
+    finally{setSavingPin(null);}
+  };
+
   const fetch_ = useCallback(async(f:string,q:string,off:number)=>{
     if(f==="agents"){ fetchAgents(q,off); return; }
+    if(f==="music"){ fetchMusic(q); return; }
+    if(f==="pins"){ fetchPins(q); return; }
     setLoading(true);
     try{
       const p=new URLSearchParams({filter:f,q,offset:String(off),limit:String(LIMIT)});
@@ -145,7 +237,7 @@ export default function SkinsPage() {
       off===0?setSkins(d.items??[]):setSkins(prev=>[...prev,...(d.items??[])]);
       setTotal(d.total??0);
     }finally{setLoading(false);}
-  },[fetchAgents]);
+  },[fetchAgents, fetchMusic, fetchPins]);
 
   useEffect(()=>{ setOffset(0);setSkins([]);fetch_(cat,query,0); },[cat]); // eslint-disable-line
 
@@ -174,6 +266,20 @@ export default function SkinsPage() {
   },{} as Record<string,Skin[]>);
   const groupNames=Object.keys(groups).sort();
 
+  const configuredInCatalog = useMemo(() => {
+    if (["loadout", "agents", "music", "pins"].includes(cat)) return 0;
+    return visibleSkins.filter((s) => {
+      const def = getDefindex(s);
+      const paint = parseInt(s.paint_index ?? "0", 10);
+      const k = key(def, paint);
+      const sav = saved[k];
+      if (!sav) return false;
+      if (team === "all") return true;
+      if (team === "ct") return sav.weapon_team === 3 || sav.weapon_team === 0;
+      return sav.weapon_team === 2 || sav.weapon_team === 0;
+    }).length;
+  }, [visibleSkins, saved, team, cat]);
+
   const handleSave=async(skin:Skin,opts:{float:number;stattrak:boolean})=>{
     const def=getDefindex(skin); 
     if(!def){
@@ -190,8 +296,13 @@ export default function SkinsPage() {
           weapon_wear:clamp(opts.float,skin.min_float,skin.max_float),weapon_stattrak:opts.stattrak,weapon_team:tNum})});
       if(!r.ok) throw new Error();
       const ns:Saved={weapon_defindex:def,weapon_paint_id:paint,weapon_wear:opts.float,weapon_stattrak:opts.stattrak?1:0,weapon_team:tNum};
-      setSaved(p=>{const n={...p};const old=activeByDef[def];if(old!==undefined&&old!==paint)delete n[key(def,old)];n[k]=ns;return n;});
-      setActive(p=>({...p,[def]:paint}));
+      setSaved(p=>{const n={...p}; n[k]=ns; return n;});
+      setActive(p=>{
+        const n={...p};
+        if(!n[def]) n[def]={};
+        n[def][tNum] = paint;
+        return n;
+      });
       showToast(`★ ${skin.name} salva! Digite !wp no jogo.`,true);
     }catch{showToast("Falha ao salvar",false);}
     finally{setBusyKey(null);}
@@ -204,7 +315,11 @@ export default function SkinsPage() {
       await fetch("/api/skins/weapon",{method:"DELETE",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({weapon_defindex:def,weapon_team:tNum})});
       setSaved(p=>{const n={...p};delete n[k];return n;});
-      setActive(p=>{const n={...p};delete n[def];return n;});
+      setActive(p=>{
+        const n={...p};
+        if(n[def]) delete n[def][tNum];
+        return n;
+      });
       showToast("Skin removida",true);
     }catch{showToast("Falha",false);}
     finally{setBusyKey(null);}
@@ -217,39 +332,75 @@ export default function SkinsPage() {
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col">
       {/* ── Header ─────────────────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-40" style={{background:"rgba(2,6,23,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-        <div className="max-w-[1700px] mx-auto px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-black italic tracking-tight">MINHA <span className="text-amber-400">LOADOUT</span></h1>
-            <p className="text-[10px] text-slate-500">Salve skins e use <code className="text-amber-400">!wp</code> + <code className="text-amber-400">!kill</code> no jogo</p>
+      <div className="sticky top-0 z-40 border-b border-white/5 bg-slate-950/95 shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+        <div className="max-w-[1700px] mx-auto px-4 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Link
+              href="/"
+              className="mt-0.5 shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-bold text-slate-300 transition hover:border-amber-500/30 hover:bg-amber-500/10 hover:text-white"
+            >
+              {"<"} Voltar
+            </Link>
+            <div>
+              <h1 className="text-2xl font-black italic tracking-tight text-white">
+                MINHA <span className="text-amber-500">LOADOUT</span>
+              </h1>
+              <p className="mt-0.5 text-sm text-amber-100/80">
+                Salve skins e use{" "}
+                <code className="rounded bg-white/10 px-1.5 py-0.5 text-amber-200">!wp</code> +{" "}
+                <code className="rounded bg-white/10 px-1.5 py-0.5 text-amber-200">!kill</code> no jogo
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Team filter */}
-            <div className="flex rounded-lg overflow-hidden" style={{border:"1px solid rgba(255,255,255,0.08)"}}>
-              {(["all","ct","t"] as const).map(t=>(
-                <button key={t} onClick={()=>setTeam(t)}
-                  className="px-3 py-1.5 text-xs font-bold uppercase transition-all"
-                  style={{background:team===t?(t==="ct"?"#3b82f6":t==="t"?"#f59e0b":"rgba(255,255,255,0.1)"):"transparent",color:team===t?"#fff":"rgba(255,255,255,0.4)"}}>
-                  {t==="all"?"ALL":t.toUpperCase()}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex overflow-hidden rounded-xl border border-white/10 p-0.5">
+              {(["all", "ct", "t"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTeam(t)}
+                  className={`rounded-lg px-3.5 py-2 text-xs font-bold uppercase transition-all ${
+                    team === t
+                      ? t === "all"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : t === "ct"
+                          ? "bg-blue-500 text-white shadow-md shadow-blue-500/20"
+                          : "bg-amber-500 text-slate-900 shadow-md shadow-amber-500/20"
+                      : "text-slate-500 hover:text-slate-200"
+                  }`}
+                >
+                  {t === "all" ? "All" : t === "ct" ? "CT" : "T"}
                 </button>
               ))}
             </div>
-            {/* Search */}
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
-              <input type="text" placeholder="Buscar…" value={query} onChange={e=>setQuery(e.target.value)}
-                className="pl-8 pr-4 py-2 rounded-xl text-sm text-white placeholder:text-slate-500 outline-none w-52"
-                style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)"}} />
+            <div className="relative min-w-0 flex-1 sm:max-w-xs">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
+              <input
+                type="search"
+                placeholder="Buscar.."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-4 text-sm text-white placeholder:text-slate-600 outline-none ring-0 transition focus:border-amber-500/40 focus:ring-2 focus:ring-amber-500/20"
+              />
             </div>
           </div>
         </div>
-        {/* Category tabs */}
-        <div className="max-w-[1700px] mx-auto px-4 pb-2 flex gap-1.5 overflow-x-auto">
-          {CATEGORIES.map(f=>(
-            <button key={f.id} onClick={()=>setCat(f.id)}
-              className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition-all"
-              style={{background:cat===f.id?"#f59e0b":"rgba(255,255,255,0.04)",color:cat===f.id?"#1c1917":"rgba(255,255,255,0.5)",border:"1px solid",borderColor:cat===f.id?"transparent":"rgba(255,255,255,0.06)"}}>
-              {f.icon} {f.label}
+        <div className="max-w-[1700px] mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
+          {CATEGORIES.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setCat(f.id)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider transition-all ${
+                cat === f.id
+                  ? "border-2 border-amber-500 bg-amber-500/10 text-amber-200 shadow-sm shadow-amber-500/10"
+                  : "border border-white/10 bg-white/[0.04] text-slate-500 hover:border-white/20 hover:text-slate-200"
+              }`}
+            >
+              <span className="opacity-90" aria-hidden>
+                {f.icon}
+              </span>{" "}
+              {f.label}
             </button>
           ))}
         </div>
@@ -258,55 +409,84 @@ export default function SkinsPage() {
       {/* ── Main layout ────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 max-w-[1700px] mx-auto w-full px-4 py-4 gap-4">
 
-        {/* ── Loadout sidebar ──────────────────────────────────────────────────── */}
-        <div className="hidden lg:flex flex-col w-56 shrink-0 gap-2">
-          <div className="sticky top-28">
-            <p className="text-[10px] font-black text-amber-400 uppercase tracking-[0.15em] mb-2">LOADOUT ATUAL</p>
-            {savedList.length===0?(
-              <div className="rounded-xl p-4 text-center" style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)"}}>
-                <p className="text-xs text-slate-500">Nenhuma skin configurada</p>
+        {/* ── Main content area ────────────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0 pb-20">
+          
+          {cat === "loadout" && (
+            <div className="space-y-4">
+              <div className="mb-4 flex items-end justify-between gap-4">
+                <h2 className="text-lg font-bold text-white">Loadout ativo</h2>
+                <p className="text-right">
+                  <span className="text-2xl font-black tabular-nums text-amber-400">{savedList.length}</span>
+                  <span className="ml-2 text-sm text-slate-500">peças</span>
+                </p>
               </div>
-            ):(
-              <div className="space-y-1.5">
-                {savedList.map(s=>{
-                  const skin=skins.find(sk=>getDefindex(sk)===s.weapon_defindex&&parseInt(sk.paint_index??"0",10)===s.weapon_paint_id);
-                  const label=skin?skin.name:`Defindex ${s.weapon_defindex}`;
-                  const weapLabel=skin?skin.weapon.name:(KNIVES.has(s.weapon_defindex)?"Faca":GLOVES.has(s.weapon_defindex)?"Luva":"Arma");
-                  return (
-                    <div key={key(s.weapon_defindex,s.weapon_paint_id)}
-                      className="group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all hover:bg-white/5"
-                      style={{border:"1px solid rgba(255,255,255,0.06)"}}>
-                      {skin?.image&&<Image src={skin.image} alt={label} width={36} height={24} className="object-contain shrink-0" unoptimized/>}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[8px] text-slate-500 uppercase font-bold truncate">{weapLabel}</p>
-                        <p className="text-[10px] text-white font-bold truncate">{label}</p>
-                        <p className="text-[8px] text-slate-600">{s.weapon_wear.toFixed(3)}{s.weapon_stattrak?" • ST":""}</p>
-                      </div>
-                      <button onClick={()=>handleRemove(s.weapon_defindex,s.weapon_paint_id)}
-                        className="opacity-0 group-hover:opacity-100 w-4 h-4 rounded-full bg-red-500/70 text-white text-[8px] flex items-center justify-center shrink-0">✕</button>
-                    </div>
-                  );
-                })}
-                <div className="mt-3 p-2 rounded-lg text-center" style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)"}}>
-                  <p className="text-[9px] text-amber-400 font-bold">Digite no chat:</p>
-                  <p className="text-xs text-amber-300 font-black mt-0.5">!wp  →  !kill</p>
+              
+              {savedList.length === 0 ? (
+                <div className="rounded-xl p-8 text-center" style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)"}}>
+                  <p className="text-sm text-slate-500">Nenhuma skin configurada no momento.</p>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {savedList.map(s => {
+                    const skin=skins.find(sk=>getDefindex(sk)===s.weapon_defindex&&parseInt(sk.paint_index??"0",10)===s.weapon_paint_id);
+                    const label=skin?skin.name:`Defindex ${s.weapon_defindex}`;
+                    const weapLabel=skin?skin.weapon.name:(KNIVES.has(s.weapon_defindex)?"Faca":GLOVES.has(s.weapon_defindex)?"Luva":"Arma");
+                    return (
+                      <div key={key(s.weapon_defindex,s.weapon_paint_id)}
+                        className="group relative flex flex-col items-center gap-3 p-4 rounded-xl cursor-pointer transition-all hover:-translate-y-1"
+                        style={{background:"rgba(15,23,42,0.8)",border:"1px solid rgba(255,255,255,0.06)"}}>
+                        <div className="h-24 w-full overflow-hidden rounded-lg">
+                          <RemoteInventoryImage
+                            src={skin?.image}
+                            alt={label}
+                            className="h-full w-full object-contain"
+                            fallbackChar="🎯"
+                          />
+                        </div>
+                        <div className="text-center w-full min-w-0 mt-2">
+                          <p className="text-[10px] text-slate-500 uppercase font-bold truncate">{weapLabel}</p>
+                          <p className="text-xs text-white font-bold truncate">{label}</p>
+                          <p className="text-[9px] text-slate-600 mt-1">{s.weapon_wear.toFixed(3)}{s.weapon_stattrak?" • ST":""}</p>
+                        </div>
+                        <button onClick={()=>handleRemove(s.weapon_defindex,s.weapon_paint_id)}
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full bg-red-500/80 hover:bg-red-500 text-white text-[10px] flex items-center justify-center shrink-0 transition-all">✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* ── Skin browser ─────────────────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0">
-          {/* Stats */}
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-slate-500">
-              {total>0?<>{visibleSkins.length} de <span className="text-white font-bold">{total}</span> skins</>:loading?"Carregando…":"Nenhuma skin"}
-            </p>
-            <p className="text-xs text-slate-500">
-              <span className="text-amber-400 font-bold">{savedList.length}</span> configuradas
-            </p>
-          </div>
+          {cat !== "loadout" && !["agents", "music", "pins"].includes(cat) && (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3.5">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Catálogo (filtro atual)</p>
+                <p className="mt-0.5 text-slate-200">
+                  {total > 0 ? (
+                    <>
+                      <span className="text-2xl font-black tabular-nums text-white">{visibleSkins.length}</span>
+                      <span className="mx-1 text-slate-500">/</span>
+                      <span className="text-lg font-semibold tabular-nums text-slate-400">{total}</span>
+                      <span className="ml-2 text-sm text-slate-500">skins</span>
+                    </>
+                  ) : loading ? (
+                    <span className="text-slate-400">A carregar…</span>
+                  ) : (
+                    <span className="text-slate-500">Nada nesta categoria</span>
+                  )}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Já no teu loadout</p>
+                <p>
+                  <span className="text-2xl font-black tabular-nums text-amber-400">{savedList.length}</span>
+                  <span className="ml-2 text-sm text-slate-400">guardadas</span>
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* ── Agents UI ─────────────────────────────────────────────────── */}
           {cat==="agents"&&(
@@ -331,7 +511,9 @@ export default function SkinsPage() {
                       </div>
                       {ag?(
                         <div className="flex items-center gap-2">
-                          <Image src={ag.image} alt={ag.name} width={40} height={40} className="object-contain rounded" unoptimized/>
+                          <div className="h-10 w-10 overflow-hidden rounded">
+                            <RemoteInventoryImage src={ag.image} alt={ag.name} className="h-full w-full object-contain" fallbackChar="👤" />
+                          </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold text-white truncate">{ag.name.split("|")[0]?.trim()}</p>
                             <p className="text-[9px] text-slate-400 truncate">{ag.name.split("|")[1]?.trim()}</p>
@@ -385,10 +567,13 @@ export default function SkinsPage() {
                           style={{background:isCt?"rgba(59,130,246,0.3)":"rgba(245,158,11,0.3)",color:isCt?"#93c5fd":"#fcd34d"}}>
                           {isCt?"CT":"T"}
                         </div>
-                        <div className="aspect-square bg-gradient-to-b from-slate-800/40 to-slate-900/20 flex items-center justify-center overflow-hidden">
-                          {agent.image?<Image src={agent.image} alt={agent.name} width={120} height={120}
-                            className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-300" unoptimized/>
-                            :<div className="text-slate-600 text-2xl">👤</div>}
+                        <div className="aspect-square overflow-hidden bg-gradient-to-b from-slate-800/40 to-slate-900/20 group-hover:opacity-100">
+                          <RemoteInventoryImage
+                            src={agent.image}
+                            alt={agent.name}
+                            className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.04]"
+                            fallbackChar="👤"
+                          />
                         </div>
                         <div className="p-2">
                           <p className="text-[9px] font-bold text-white truncate">{agent.name.split("|")[0]?.trim()}</p>
@@ -413,21 +598,123 @@ export default function SkinsPage() {
             </div>
           )}
 
+          {/* ── Music UI ─────────────────────────────────────────────────── */}
+          {cat==="music"&&(
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3">
+                {(["ct","t"] as const).map(side=>{
+                  const m=side==="ct"?musicCt:musicT;
+                  const isActive=(team==="all") || (team===side);
+                  return (
+                    <div key={side} className="p-3 rounded-xl" style={{background:"rgba(255,255,255,0.03)",border:isActive?"1px solid rgba(59,130,246,0.4)":"1px solid rgba(255,255,255,0.08)"}}>
+                      <p className="text-[10px] font-black text-slate-500 uppercase mb-2">{side==="ct"?"Contra-Terrorista":"Terrorista"}</p>
+                      {m?(
+                        <div className="flex items-center gap-2">
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded">
+                            <RemoteInventoryImage src={m.image} alt={m.name} className="h-full w-full object-cover" fallbackChar="🎵" />
+                          </div>
+                          <p className="text-xs font-bold text-white truncate">{m.name}</p>
+                        </div>
+                      ):<p className="text-[10px] text-slate-500 italic">Padrão</p>}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {musics.map(m=>(
+                  <div key={m.id} onClick={()=>saveMusic(m)} className="group relative rounded-xl p-2 cursor-pointer transition-all hover:bg-white/5" style={{background:"rgba(15,23,42,0.8)",border:"1px solid rgba(255,255,255,0.06)"}}>
+                    <div className="mb-2 overflow-hidden rounded-lg">
+                      <RemoteInventoryImage
+                        src={m.image}
+                        alt={m.name}
+                        className="mx-auto h-20 w-20 object-cover transition group-hover:scale-105"
+                        fallbackChar="🎵"
+                      />
+                    </div>
+                    <p className="text-[9px] font-bold text-white text-center line-clamp-2">{m.name}</p>
+                    {savingMusic===m.id&&<div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-xl"><div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"/></div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Pins UI ─────────────────────────────────────────────────── */}
+          {cat==="pins"&&(
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3">
+                {(["ct","t"] as const).map(side=>{
+                  const p=side==="ct"?pinCt:pinT;
+                  const isActive=(team==="all") || (team===side);
+                  return (
+                    <div key={side} className="p-3 rounded-xl" style={{background:"rgba(255,255,255,0.03)",border:isActive?"1px solid rgba(59,130,246,0.4)":"1px solid rgba(255,255,255,0.08)"}}>
+                      <p className="text-[10px] font-black text-slate-500 uppercase mb-2">{side==="ct"?"Contra-Terrorista":"Terrorista"}</p>
+                      {p?(
+                        <div className="flex items-center gap-2">
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded">
+                            <RemoteInventoryImage src={p.image} alt={p.name} className="h-full w-full object-contain" fallbackChar="○" />
+                          </div>
+                          <p className="text-xs font-bold text-white truncate">{p.name}</p>
+                        </div>
+                      ):<p className="text-[10px] text-slate-500 italic">Nenhum</p>}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                {pins.map(p=>(
+                  <div key={p.id} onClick={()=>savePin(p)} className="group relative rounded-xl p-2 cursor-pointer transition-all hover:bg-white/5" style={{background:"rgba(15,23,42,0.8)",border:"1px solid rgba(255,255,255,0.06)"}}>
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden">
+                      <RemoteInventoryImage
+                        src={p.image}
+                        alt={p.name}
+                        className="max-h-16 w-full object-contain transition group-hover:scale-105"
+                        fallbackChar="○"
+                      />
+                    </div>
+                    <p className="text-[8px] font-bold text-white text-center mt-1 line-clamp-2">{p.name}</p>
+                    {savingPin===p.id&&<div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-xl"><div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"/></div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Grouped sections */}
-          {cat!=="agents"&&groupNames.length>0&&!loading&&(
+          {cat!=="agents" && cat!=="music" && cat!=="pins" && groupNames.length>0&&!loading&&(
             <div className="space-y-6">
+              {cat !== "loadout" && (
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500">
+                    {visibleSkins.length} de {total} skins
+                  </span>
+                  <span className="font-bold text-amber-400 tabular-nums">
+                    {configuredInCatalog} configuradas
+                  </span>
+                </div>
+              )}
               {groupNames.map((gname, idx)=>{
                 const gskins=groups[gname]!;
                 const isOpen=collapsed[gname] !== undefined ? collapsed[gname] : (idx === 0);
                 return (
                   <div key={gname}>
                     {/* Group header */}
-                    <button className="w-full flex items-center gap-3 mb-3 group"
-                      onClick={()=>setCollapsed(p=>({...p,[gname]:!isOpen}))}>
-                      <span className="text-sm font-black text-white">{gname}</span>
-                      <span className="text-[10px] text-slate-500 font-bold">({gskins.length})</span>
-                      <div className="flex-1 h-px" style={{background:"linear-gradient(90deg,rgba(255,255,255,0.08),transparent)"}}/>
-                      <span className="text-slate-500 text-xs transition-transform" style={{transform:isOpen?"":"rotate(-90deg)"}}>▾</span>
+                    <button
+                      type="button"
+                      className="group mb-3 flex w-full items-center gap-3 rounded-lg px-1 py-1 text-left transition hover:bg-white/[0.03]"
+                      onClick={() => setCollapsed((p) => ({ ...p, [gname]: !isOpen }))}
+                    >
+                      <span className="text-base font-black text-white">{gname}</span>
+                      <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-bold tabular-nums text-slate-300">
+                        {gskins.length}
+                      </span>
+                      <div className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" />
+                      <span
+                        className={`text-slate-400 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
+                        aria-hidden
+                      >
+                        ▾
+                      </span>
                     </button>
 
                     {isOpen&&(
@@ -437,28 +724,68 @@ export default function SkinsPage() {
                             const def=getDefindex(skin);
                             const paint=parseInt(skin.paint_index??"0",10);
                             const k=key(def,paint);
-                            const isSaved=activeByDef[def]===paint;
+                            const activeTeams = (activeByDef[def] as any) || {};
+                            const isSaved = Object.values(activeTeams).includes(paint);
+                            const teamsApplied = Object.entries(activeTeams).filter(([_,p])=>p===paint).map(([t])=>parseInt(t,10));
                             const isBusy=busyKey===k;
                             const rc=rarityColor(skin);
                             return (
                               <motion.div key={k} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:0.95}}
                                 transition={{duration:0.12,delay:Math.min(i*0.01,0.2)}}>
                                 <div
-                                  className="group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
-                                  style={{background:"rgba(15,23,42,0.8)",border:`1px solid ${isSaved?`${rc}55`:"rgba(255,255,255,0.06)"}`,boxShadow:isSaved?`0 0 16px ${rc}22`:undefined}}
-                                  onClick={()=>setSelected(skin)}>
-                                  <div className="absolute top-0 inset-x-0 h-[2px]" style={{background:`linear-gradient(90deg,${rc}00,${rc},${rc}00)`}}/>
-                                  {isSaved&&<div className="absolute top-1.5 right-1.5 z-10 w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center"><span className="text-[7px] text-slate-900 font-black">✓</span></div>}
-                                  <div className="aspect-[4/3] p-2 flex items-center justify-center" style={{background:"linear-gradient(180deg,rgba(30,41,59,0.4),transparent)"}}>
-                                    {skin.image?<Image src={skin.image} alt={skin.name} width={120} height={80}
-                                      className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-300" unoptimized/>
-                                      :<div className="text-slate-600 text-xl">?</div>}
+                                  className="group relative cursor-pointer overflow-hidden rounded-xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30 hover:ring-1 hover:ring-amber-500/20"
+                                  style={{
+                                    background: "rgba(15,23,42,0.9)",
+                                    borderColor: isSaved ? `${rc}55` : "rgba(255,255,255,0.08)",
+                                    boxShadow: isSaved ? `0 0 20px ${rc}18` : undefined,
+                                  }}
+                                  onClick={() => setSelected(skin)}
+                                >
+                                  <div
+                                    className="absolute inset-x-0 top-0 h-[2px]"
+                                    style={{ background: `linear-gradient(90deg,${rc}00,${rc},${rc}00)` }}
+                                  />
+                                  {isSaved && (
+                                    <div className="absolute right-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-slate-900/50 bg-amber-400 shadow-lg">
+                                      <span className="text-[8px] font-black text-slate-900">✓</span>
+                                    </div>
+                                  )}
+                                  <div className="absolute left-1.5 top-1.5 z-10 flex flex-col gap-1">
+                                    {teamsApplied.includes(0) && (
+                                      <span className="rounded border border-white/10 bg-white/20 px-1 text-[6px] font-black text-white backdrop-blur-sm">ANY</span>
+                                    )}
+                                    {teamsApplied.includes(2) && (
+                                      <span className="rounded border border-amber-500/20 bg-amber-500/30 px-1 text-[6px] font-black text-amber-300 backdrop-blur-sm">T</span>
+                                    )}
+                                    {teamsApplied.includes(3) && (
+                                      <span className="rounded border border-blue-500/20 bg-blue-500/30 px-1 text-[6px] font-black text-blue-300 backdrop-blur-sm">CT</span>
+                                    )}
                                   </div>
-                                  <div className="p-2">
-                                    <p className="text-[10px] font-bold text-white truncate leading-tight">{skin.name.replace(/^.*\|\s*/,"")}</p>
-                                    <div className="flex items-center gap-1 mt-1">
-                                      <span className="text-[7px] font-bold px-1 py-0.5 rounded uppercase" style={{color:rc,background:`${rc}18`}}>{skin.rarity?.name?.split(" ").pop()}</span>
-                                      {skin.stattrak&&<span className="text-[7px] font-bold text-orange-400 bg-orange-400/10 px-1 py-0.5 rounded">ST</span>}
+                                  <div
+                                    className="flex aspect-[4/3] items-center justify-center p-2"
+                                    style={{ background: "linear-gradient(180deg,rgba(30,41,59,0.5),transparent)" }}
+                                  >
+                                    <RemoteInventoryImage
+                                      src={skin.image}
+                                      alt={skin.name}
+                                      className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                                      fallbackChar="🗡"
+                                    />
+                                  </div>
+                                  <div className="px-2.5 pb-2.5 pt-1">
+                                    <p className="line-clamp-2 min-h-[2.25em] text-[10px] font-bold leading-tight text-white">
+                                      {skin.name.replace(/^.*\|\s*/, "")}
+                                    </p>
+                                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                      <span
+                                        className="rounded px-1.5 py-0.5 text-[7px] font-bold uppercase"
+                                        style={{ color: rc, background: `${rc}20` }}
+                                      >
+                                        {skin.rarity?.name?.split(" ").pop()}
+                                      </span>
+                                      {skin.stattrak && (
+                                        <span className="rounded bg-orange-400/15 px-1.5 py-0.5 text-[7px] font-bold text-orange-400">ST</span>
+                                      )}
                                     </div>
                                   </div>
                                   {isSaved&&!isBusy&&(

@@ -21,6 +21,7 @@ const KNOWN_ORDER = [
   "PANEL_DATA_DIR",
   "PANEL_COMPOSE_DIR",
   "ADMIN_STEAMID64S",
+  "FACEIT_API_KEY",
 ] as const;
 
 function parseEnvContent(content: string): Record<string, string> {
@@ -54,7 +55,7 @@ export function writeServerEnvFile(projectDir: string, updates: Record<string, s
   const current = readServerEnvFile(projectDir);
   const next = { ...current, ...updates };
   const lines: string[] = [
-    "# Gerado/actualizado pelo painel. Revisa antes de fazer commit.",
+    "# Gerado/atualizado pelo painel. Revise antes de commitar.",
   ];
   for (const k of KNOWN_ORDER) {
     if (k in next) {

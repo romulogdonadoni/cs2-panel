@@ -152,10 +152,31 @@ export function StickerKeychainModal({ weaponName, weaponDefindex, weaponTeam = 
     fetch(`/api/skins/stickers?weapon_defindex=${weaponDefindex}&weapon_team=${weaponTeam}`)
       .then(r => r.json())
       .then(d => {
-        if (d.stickers) setStickers(d.stickers);
-        if (d.sticker_wear) setStickerWear(d.sticker_wear);
-        if (d.keychain !== undefined) setKeychain(d.keychain);
-        if (d.keychain_seed !== undefined) setKeychainSeed(d.keychain_seed);
+        if (Array.isArray(d.stickers)) {
+          const ids = d.stickers.map((s: any) => s?.id ?? null);
+          const wears = d.stickers.map((s: any) => s?.wear ?? 0);
+          setStickers(ids);
+          setStickerWear(wears);
+          
+          // Popula catálogo com os itens já equipados
+          d.stickers.forEach((s: any) => {
+            if (s?.id && s.name && s.image) {
+              setCatalog(prev => ({ ...prev, [s.id]: { id: String(s.id), name: s.name, image: s.image, def_index: String(s.id), rarity: s.rarity } }));
+            }
+          });
+        }
+        
+        if (d.keychain) {
+          const kc = d.keychain;
+          setKeychain(kc.id);
+          setKeychainSeed(kc.seed ?? 0);
+          if (kc.id && kc.name && kc.image) {
+            setCatalog(prev => ({ ...prev, [kc.id]: { id: String(kc.id), name: kc.name, image: kc.image, def_index: String(kc.id), rarity: kc.rarity } }));
+          }
+        } else {
+          setKeychain(null);
+          setKeychainSeed(0);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
