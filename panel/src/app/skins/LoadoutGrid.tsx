@@ -184,12 +184,12 @@ export function LoadoutGrid({
 
     const labelCls =
       variant === "showcase"
-        ? "mb-1 text-[10px] font-black uppercase leading-tight tracking-wide text-[#A0AEC0] sm:text-[11px]"
+        ? "mb-1 text-[10px] font-black uppercase leading-tight tracking-wide text-zinc-400 sm:text-[11px]"
         : variant === "meta"
-          ? "mb-0.5 text-[10px] font-black uppercase leading-tight tracking-wide text-[#A0AEC0]"
+          ? "mb-0.5 text-[10px] font-black uppercase leading-tight tracking-wide text-zinc-400"
           : variant === "accessory" || variant === "accessoryPin"
-            ? "mb-0.5 truncate text-[9px] font-black uppercase tracking-wide text-[#A0AEC0]"
-            : "mb-0.5 truncate text-[9px] font-black uppercase leading-tight tracking-wide text-[#A0AEC0]";
+            ? "mb-0.5 truncate text-[9px] font-black uppercase tracking-wide text-zinc-400"
+            : "mb-0.5 truncate text-[9px] font-black uppercase leading-tight tracking-wide text-zinc-400";
 
     const imgWrapCls =
       variant === "showcase"
@@ -335,7 +335,7 @@ export function LoadoutGrid({
 
       {/* Bento: 12 colunas × 8 linhas iguais — sem scroll, preenche a viewport */}
       <div
-        className="grid min-h-0 flex-1 gap-1.5 overflow-hidden [grid-template-columns:repeat(12,minmax(0,1fr))] [grid-template-rows:repeat(8,minmax(0,1fr))] sm:gap-2"
+        className="grid min-h-0 flex-1 gap-1.5 overflow-hidden [grid-template-columns:repeat(12,minmax(0,1fr))] [grid-template-rows:repeat(2,minmax(0,1.2fr))_minmax(0,0.8fr)_repeat(5,minmax(0,1fr))] sm:gap-2"
         aria-label="Loadout em grelha bento"
       >
         {/* Tier 1 — showcase (linhas 1–2) */}
@@ -373,7 +373,7 @@ export function LoadoutGrid({
 
         {/* Tier 3 — altura das linhas segue o conteúdo; align-content:start evita “fileiras” vazias esticadas */}
         <div
-          className="col-span-12 row-start-4 row-end-9 grid min-h-0 [grid-auto-rows:minmax(0,auto)] [grid-template-columns:repeat(12,minmax(0,1fr))] content-start gap-1.5 sm:gap-2"
+          className="col-span-12 row-start-4 row-end-9 grid grid-flow-row-dense min-h-0 [grid-auto-rows:minmax(0,auto)] [grid-template-columns:repeat(12,minmax(0,1fr))] content-start gap-1.5 sm:gap-2"
           aria-label="Armas secundárias e utilitárias"
         >
           {tier3List.map((w) => (
