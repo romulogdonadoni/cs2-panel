@@ -184,18 +184,18 @@ export function LoadoutGrid({
 
     const labelCls =
       variant === "showcase"
-        ? "mb-1 text-[10px] font-black uppercase leading-tight tracking-wide text-zinc-500 sm:text-[11px]"
+        ? "mb-1 text-[10px] font-black uppercase leading-tight tracking-wide text-[#A0AEC0] sm:text-[11px]"
         : variant === "meta"
-          ? "mb-0.5 text-[10px] font-black uppercase leading-tight tracking-wide text-zinc-500"
+          ? "mb-0.5 text-[10px] font-black uppercase leading-tight tracking-wide text-[#A0AEC0]"
           : variant === "accessory" || variant === "accessoryPin"
-            ? "mb-0.5 truncate text-[9px] font-black uppercase tracking-wide text-zinc-500"
-            : "mb-0.5 truncate text-[9px] font-black uppercase leading-tight tracking-wide text-zinc-500";
+            ? "mb-0.5 truncate text-[9px] font-black uppercase tracking-wide text-[#A0AEC0]"
+            : "mb-0.5 truncate text-[9px] font-black uppercase leading-tight tracking-wide text-[#A0AEC0]";
 
     const imgWrapCls =
       variant === "showcase"
         ? "flex min-h-0 flex-1 items-center justify-center py-1"
         : variant === "meta"
-          ? "flex min-h-0 flex-[1.1] items-center justify-center py-0.5"
+          ? "flex max-h-[4.25rem] min-h-0 shrink-0 items-center justify-center py-0.5 sm:max-h-[4.75rem]"
           : variant === "accessory"
             ? "flex min-h-0 flex-1 items-center justify-center py-0.5"
             : variant === "accessoryPin"
@@ -206,7 +206,7 @@ export function LoadoutGrid({
       variant === "showcase"
         ? "max-h-full min-h-0 w-full flex-1 object-contain transition duration-300 group-hover:scale-[1.02]"
         : variant === "meta"
-          ? "max-h-[min(100%,5.5rem)] w-full object-contain transition group-hover:scale-[1.02] sm:max-h-[min(100%,6.25rem)]"
+          ? "max-h-[min(100%,4rem)] w-full object-contain transition group-hover:scale-[1.02] sm:max-h-[min(100%,4.5rem)]"
           : variant === "accessory"
             ? "max-h-full min-h-0 w-full flex-1 object-contain transition group-hover:scale-[1.02]"
             : variant === "accessoryPin"
@@ -365,19 +365,19 @@ export function LoadoutGrid({
         {/* Tier 2 — meta (linha 3): cada arma span 2 colunas */}
         <div className="col-span-12 row-start-3 row-end-4 grid min-h-0 grid-cols-12 gap-1.5 sm:gap-2">
           {tier2List.map((w) => (
-            <div key={`meta-${w.id}`} className="col-span-2 min-h-0">
+            <div key={`meta-${w.id}`} className="col-span-2 min-h-0 self-start">
               {renderItem(w.def, w.label, w.id, team, "weapon", { variant: "meta" })}
             </div>
           ))}
         </div>
 
-        {/* Tier 3 — células compactas (linhas 4–8) */}
+        {/* Tier 3 — altura das linhas segue o conteúdo; align-content:start evita “fileiras” vazias esticadas */}
         <div
-          className="col-span-12 row-start-4 row-end-9 grid min-h-0 [grid-auto-flow:dense] [grid-template-columns:repeat(12,minmax(0,1fr))] [grid-template-rows:repeat(5,minmax(0,1fr))] gap-1.5 sm:gap-2"
+          className="col-span-12 row-start-4 row-end-9 grid min-h-0 [grid-auto-rows:minmax(0,auto)] [grid-template-columns:repeat(12,minmax(0,1fr))] content-start gap-1.5 sm:gap-2"
           aria-label="Armas secundárias e utilitárias"
         >
           {tier3List.map((w) => (
-            <div key={w.id} className="col-span-2 min-h-0 sm:col-span-2 lg:col-span-1">
+            <div key={w.id} className="col-span-2 min-h-0 self-start sm:col-span-2 lg:col-span-1">
               {renderItem(w.def, w.label, w.id, team, "weapon", { variant: "standard" })}
             </div>
           ))}
