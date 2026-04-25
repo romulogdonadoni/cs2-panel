@@ -86,6 +86,7 @@ export function LoadoutGrid({
   onConfigureSlot?: (payload: { skin: Skin; saved: Saved; slotTeam: "ct" | "t"; label: string }) => void;
 }) {
   const [activeTeam, setActiveTeam] = useState<"ct" | "t">("ct");
+  const [selectedSlotKey, setSelectedSlotKey] = useState<string | null>(null);
 
   const team = activeTeam;
   const weaponsForSide = useMemo(
@@ -102,6 +103,15 @@ export function LoadoutGrid({
     const tier3Weapons = weaponsForSide.filter((w) => !t2.has(w.def));
     return { tier2List: tier2Weapons, tier3List: tier3Weapons };
   }, [weaponsForSide, team]);
+
+  const tier3Groups = useMemo(
+    () => ({
+      pistols: tier3List.filter((w) => w.category === "pistols").slice(0, 6),
+      mid: tier3List.filter((w) => w.category === "mid").slice(0, 9),
+      rifles: tier3List.filter((w) => w.category === "rifles").slice(0, 6),
+    }),
+    [tier3List]
+  );
 
   const renderItem = (
     defindex: number,
@@ -189,44 +199,44 @@ export function LoadoutGrid({
           ? "mb-0.5 text-[10px] font-black uppercase leading-tight tracking-wide text-zinc-400"
           : variant === "accessory" || variant === "accessoryPin"
             ? "mb-0.5 truncate text-[9px] font-black uppercase tracking-wide text-zinc-400"
-            : "mb-0.5 truncate text-[9px] font-black uppercase leading-tight tracking-wide text-zinc-400";
+            : "mb-0.5 truncate text-[8px] font-black uppercase leading-tight tracking-wide text-zinc-500";
 
     const imgWrapCls =
       variant === "showcase"
-        ? "flex min-h-0 flex-1 items-center justify-center py-1"
+        ? "relative min-h-0 flex-1 overflow-hidden py-1"
         : variant === "meta"
-          ? "flex max-h-[4.25rem] min-h-0 shrink-0 items-center justify-center py-0.5 sm:max-h-[4.75rem]"
+          ? "relative max-h-[4.75rem] min-h-0 shrink-0 overflow-hidden py-1 sm:max-h-[5.25rem]"
           : variant === "accessory"
-            ? "flex min-h-0 flex-1 items-center justify-center py-0.5"
+            ? "relative min-h-0 flex-1 overflow-hidden py-0.5"
             : variant === "accessoryPin"
-              ? "flex h-10 shrink-0 items-center justify-center"
-              : "flex h-[2.85rem] shrink-0 items-center justify-center sm:h-[3.1rem]";
+              ? "relative h-10 shrink-0 overflow-hidden"
+              : "relative h-[2.85rem] shrink-0 overflow-hidden sm:h-[3.1rem]";
 
     const imgCls =
       variant === "showcase"
-        ? "max-h-full min-h-0 w-full flex-1 object-contain transition duration-300 group-hover:scale-[1.02]"
+        ? "absolute inset-0 h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
         : variant === "meta"
-          ? "max-h-[min(100%,4rem)] w-full object-contain transition group-hover:scale-[1.02] sm:max-h-[min(100%,4.5rem)]"
+          ? "absolute inset-0 h-full w-full object-contain transition group-hover:scale-[1.02]"
           : variant === "accessory"
-            ? "max-h-full min-h-0 w-full flex-1 object-contain transition group-hover:scale-[1.02]"
+            ? "absolute inset-0 h-full w-full object-contain transition group-hover:scale-[1.02]"
             : variant === "accessoryPin"
-              ? "max-h-8 w-full object-contain"
-              : "max-h-full max-w-full object-contain transition group-hover:scale-[1.03]";
+              ? "absolute inset-0 h-full w-full object-contain"
+              : "absolute inset-0 h-full w-full object-contain transition group-hover:scale-[1.03]";
 
     const titleCls =
       variant === "showcase"
         ? "line-clamp-3 text-left text-xs font-bold leading-snug text-zinc-100 sm:text-sm"
         : variant === "meta"
-          ? "line-clamp-2 text-center text-[11px] font-bold leading-snug text-zinc-100 sm:text-xs"
+          ? "line-clamp-2 text-center text-xs font-bold leading-snug text-zinc-50"
           : variant === "accessory" || variant === "accessoryPin"
-            ? "line-clamp-2 text-center text-[10px] font-semibold leading-tight text-zinc-200"
-            : "line-clamp-2 text-center text-[10px] font-bold leading-tight text-zinc-100";
+            ? "line-clamp-2 text-center text-[11px] font-semibold leading-tight text-zinc-100"
+            : "truncate text-center text-[11px] font-semibold leading-tight text-zinc-100";
 
     const pad =
       variant === "showcase"
-        ? "p-2 sm:p-2.5"
+        ? "p-1.5 sm:p-2"
         : variant === "meta"
-          ? "p-1.5 sm:p-2"
+          ? "p-2 sm:p-2.5"
           : variant === "accessory" || variant === "accessoryPin"
             ? "p-1.5"
             : "p-1 sm:p-1.5";
@@ -238,11 +248,25 @@ export function LoadoutGrid({
           ? "right-1 top-1"
           : "right-1 top-5 sm:top-6";
 
+    const slotKey = `${teamSlot}-${defindex}-${label}-${type}`;
+    const isSelected = selectedSlotKey === slotKey;
+    const interactiveGlow =
+      variant === "standard"
+        ? "hover:shadow-[0_0_0_1px_rgba(245,158,11,0.45),0_10px_24px_rgba(0,0,0,0.35)]"
+        : "hover:shadow-[0_0_0_1px_rgba(245,158,11,0.45),0_12px_28px_rgba(0,0,0,0.4)]";
+
     return (
       <div
-        key={`${teamSlot}-${defindex}-${label}-${type}`}
-        onClick={() => onSlotClick({ defindex, label, team: teamSlot, type, weaponId })}
-        className={`group relative flex min-h-0 cursor-pointer flex-col rounded-xl border border-white/10 bg-zinc-900/60 shadow-sm transition hover:border-amber-500/35 hover:bg-zinc-900/90 ${pad} ${gridClass}`}
+        key={slotKey}
+        onClick={() => {
+          setSelectedSlotKey(slotKey);
+          onSlotClick({ defindex, label, team: teamSlot, type, weaponId });
+        }}
+        className={`group relative flex h-full min-h-0 cursor-pointer flex-col overflow-hidden rounded-xl border bg-zinc-900/60 transition ${interactiveGlow} ${
+          isSelected
+            ? "border-amber-400/70 shadow-[0_0_0_1px_rgba(245,158,11,0.6),0_12px_30px_rgba(0,0,0,0.45)]"
+            : "border-white/10 shadow-sm hover:border-amber-500/40 hover:bg-zinc-900/92"
+        } ${pad} ${gridClass}`}
       >
         <div className={`min-h-0 shrink-0 ${labelCls}`}>{label}</div>
         <div className={imgWrapCls}>
@@ -313,29 +337,31 @@ export function LoadoutGrid({
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden">
-      <div className="flex shrink-0 justify-center gap-1.5">
+    <div className="flex h-full min-h-0 w-full flex-col gap-2.5 overflow-hidden">
+      <div className="flex shrink-0 justify-center">
+        <div className="inline-flex items-center rounded-lg border border-white/10 bg-zinc-900/80 p-1 shadow-[0_8px_20px_rgba(0,0,0,0.35)]">
         {(["ct", "t"] as const).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setActiveTeam(t)}
-            className={`rounded-md px-3 py-1 text-[11px] font-black uppercase tracking-wide transition ${
+            className={`rounded-md px-4 py-1.5 text-[11px] font-black uppercase tracking-wide transition ${
               activeTeam === t
                 ? t === "ct"
-                  ? "bg-zinc-100 text-zinc-900 ring-1 ring-amber-500/50"
-                  : "bg-amber-500 text-zinc-950 ring-1 ring-amber-400/60"
-                : "border border-white/10 bg-zinc-900/80 text-zinc-500 hover:border-white/20 hover:text-zinc-300"
+                  ? "bg-zinc-100 text-zinc-900 ring-1 ring-amber-500/60"
+                  : "bg-amber-500 text-zinc-950 ring-1 ring-amber-400/70"
+                : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100"
             }`}
           >
             {t === "ct" ? "CT" : "TR"}
           </button>
         ))}
+        </div>
       </div>
 
-      {/* Bento: 12 colunas × 8 linhas iguais — sem scroll, preenche a viewport */}
+      {/* Bento: 12 colunas × 8 linhas iguais — sem scroll, previsível */}
       <div
-        className="grid min-h-0 flex-1 gap-1.5 overflow-hidden [grid-template-columns:repeat(12,minmax(0,1fr))] [grid-template-rows:repeat(2,minmax(0,1.2fr))_minmax(0,0.8fr)_repeat(5,minmax(0,1fr))] sm:gap-2"
+        className="grid min-h-0 flex-1 gap-2 overflow-hidden [grid-template-columns:repeat(12,minmax(0,1fr))] [grid-template-rows:repeat(8,minmax(0,1fr))] sm:gap-2.5"
         aria-label="Loadout em grelha bento"
       >
         {/* Tier 1 — showcase (linhas 1–2) */}
@@ -363,7 +389,7 @@ export function LoadoutGrid({
         })}
 
         {/* Tier 2 — meta (linha 3): cada arma span 2 colunas */}
-        <div className="col-span-12 row-start-3 row-end-4 grid min-h-0 grid-cols-12 gap-1.5 sm:gap-2">
+        <div className="col-span-12 row-start-3 row-end-4 grid min-h-0 grid-cols-12 gap-2 sm:gap-2.5">
           {tier2List.map((w) => (
             <div key={`meta-${w.id}`} className="col-span-2 min-h-0 self-start">
               {renderItem(w.def, w.label, w.id, team, "weapon", { variant: "meta" })}
@@ -371,16 +397,49 @@ export function LoadoutGrid({
           ))}
         </div>
 
-        {/* Tier 3 — altura das linhas segue o conteúdo; align-content:start evita “fileiras” vazias esticadas */}
+        {/* Tier 3 — agrupamento semântico compacto */}
         <div
-          className="col-span-12 row-start-4 row-end-9 grid grid-flow-row-dense min-h-0 [grid-auto-rows:minmax(0,auto)] [grid-template-columns:repeat(12,minmax(0,1fr))] content-start gap-1.5 sm:gap-2"
+          className="col-span-12 row-start-4 row-end-9 grid min-h-0 grid-cols-12 gap-2 sm:gap-2.5"
           aria-label="Armas secundárias e utilitárias"
         >
-          {tier3List.map((w) => (
-            <div key={w.id} className="col-span-2 min-h-0 self-start sm:col-span-2 lg:col-span-1">
-              {renderItem(w.def, w.label, w.id, team, "weapon", { variant: "standard" })}
+          <div className="col-span-4 flex min-h-0 flex-col gap-1.5">
+            <p className="shrink-0 border-b border-white/10 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300">
+              Pistolas
+            </p>
+            <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-2">
+              {tier3Groups.pistols.map((w) => (
+                <div key={w.id} className="min-h-0">
+                  {renderItem(w.def, w.label, w.id, team, "weapon", { variant: "standard" })}
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div className="col-span-4 flex min-h-0 flex-col gap-1.5">
+            <p className="shrink-0 border-b border-white/10 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300">
+              Intermediárias
+            </p>
+            <div className="grid min-h-0 flex-1 grid-cols-3 content-start gap-2">
+              {tier3Groups.mid.map((w) => (
+                <div key={w.id} className="min-h-0">
+                  {renderItem(w.def, w.label, w.id, team, "weapon", { variant: "standard" })}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="col-span-4 flex min-h-0 flex-col gap-1.5">
+            <p className="shrink-0 border-b border-white/10 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300">
+              Rifles
+            </p>
+            <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-2">
+              {tier3Groups.rifles.map((w) => (
+                <div key={w.id} className="min-h-0">
+                  {renderItem(w.def, w.label, w.id, team, "weapon", { variant: "standard" })}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
