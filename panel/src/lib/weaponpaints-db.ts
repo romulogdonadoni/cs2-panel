@@ -212,11 +212,36 @@ export async function savePlayerPin(steamid: string, team: 0 | 2 | 3, pin_id: nu
   );
 }
 
-/** Remove skin de uma arma específica */
+/** Remove skin de uma arma específica. team 0 = ambos os lados (TR+CT), alinhado ao POST. */
 export async function removePlayerSkin(steamid: string, team: 0 | 2 | 3, defindex: number): Promise<void> {
   const db = getWeaponPaintsDb();
+  if (team === 0) {
+    await db.execute(
+      "DELETE FROM wp_player_skins WHERE steamid = ? AND weapon_defindex = ? AND weapon_team IN (0, 2, 3)",
+      [steamid, defindex]
+    );
+  } else {
+    await db.execute(
+      "DELETE FROM wp_player_skins WHERE steamid = ? AND weapon_team = ? AND weapon_defindex = ?",
+      [steamid, team, defindex]
+    );
+  }
+}
+
+/** Limpa skins de luvas (wp_player_skins) para uma equipa antes de gravar nova luva */
+export async function clearPlayerGlovesSkins(steamid: string, team: 0 | 2 | 3): Promise<void> {
+  const db = getWeaponPaintsDb();
   await db.execute(
-    "DELETE FROM wp_player_skins WHERE steamid = ? AND weapon_team = ? AND weapon_defindex = ?",
-    [steamid, team, defindex]
+    "DELETE FROM wp_player_skins WHERE steamid = ? AND weapon_team = ? AND weapon_defindex IN (4725, 5027, 5030, 5031, 5032, 5033, 5034, 5035)",
+    [steamid, team]
+  );
+}
+
+/** Limpa skins de facas para uma equipa antes de gravar nova faca */
+export async function clearPlayerKnivesSkins(steamid: string, team: 0 | 2 | 3): Promise<void> {
+  const db = getWeaponPaintsDb();
+  await db.execute(
+    "DELETE FROM wp_player_skins WHERE steamid = ? AND weapon_team = ? AND weapon_defindex IN (500,503,505,506,507,508,509,512,514,515,516,517,518,519,520,521,522,523,525,526)",
+    [steamid, team]
   );
 }

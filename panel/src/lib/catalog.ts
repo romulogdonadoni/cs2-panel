@@ -233,9 +233,17 @@ function skinMatchesFilter(s: SkinRow, filter: string): boolean {
   }
 }
 
-export function filterSkins(all: SkinRow[], filter: string, q: string): SkinRow[] {
+export function filterSkins(
+  all: SkinRow[],
+  filter: string,
+  q: string,
+  weaponDefindex?: number | null
+): SkinRow[] {
   const qn = (q || "").trim().toLowerCase();
   let list = all.filter((s) => skinMatchesFilter(s, filter));
+  if (weaponDefindex != null && Number.isFinite(weaponDefindex) && weaponDefindex > 0) {
+    list = list.filter((s) => s.weapon?.weapon_id === weaponDefindex);
+  }
   if (qn) {
     list = list.filter((s) => s.name.toLowerCase().includes(qn));
   }

@@ -3,18 +3,36 @@ import { getSession } from "@/lib/auth";
 import { loadPlayerMusic, savePlayerMusic } from "@/lib/weaponpaints-db";
 import { loadMusicData } from "@/lib/catalog";
 
+function resolveMusicKit(
+  allMusic: Awaited<ReturnType<typeof loadMusicData>>,
+  musicId: number
+) {
+  const idStr = String(musicId);
+  return (
+    allMusic.find((x) => String(x.def_index ?? "") === idStr) ??
+    allMusic.find((x) => x.id === `music_kit-${idStr}`)
+  );
+}
+
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const rows = await loadPlayerMusic(session.steamid64);
-  
+
   const dataDir = process.env.PANEL_DATA_DIR || "/data";
   const allMusic = await loadMusicData(dataDir).catch(() => []);
 
-  const musicInfo = rows.map(r => {
-    const item = allMusic.find(x => x.def_index === String(r.music_id));
-    return item ? { id: r.music_id, name: item.name, image: item.image, team: r.weapon_team } : { id: r.music_id, team: r.weapon_team };
+  const musicInfo = rows.map((r) => {
+    const item = resolveMusicKit(allMusic, r.music_id);
+    const image = item?.image ?? "";
+    const name = item?.name ?? `Kit #${r.music_id}`;
+    return {
+      id: r.music_id,
+      name,
+      image,
+      team: r.weapon_team,
+    };
   });
 
   return NextResponse.json({ music: musicInfo });

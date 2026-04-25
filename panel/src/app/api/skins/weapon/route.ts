@@ -5,32 +5,11 @@ import {
   savePlayerKnife,
   savePlayerGloves,
   removePlayerSkin,
+  clearPlayerGlovesSkins,
+  clearPlayerKnivesSkins,
   type WpSkinRow,
 } from "@/lib/weaponpaints-db";
-
-// Mapa: defindex da faca → classname CS2 (para wp_player_knife)
-const KNIFE_CLASSNAMES: Record<number, string> = {
-  500: "weapon_bayonet",
-  505: "weapon_knife_flip",
-  506: "weapon_knife_gut",
-  507: "weapon_knife_karambit",
-  508: "weapon_knife_m9_bayonet",
-  509: "weapon_knife_tactical",
-  512: "weapon_knife_falchion",
-  514: "weapon_knife_survival_bowie",
-  515: "weapon_knife_butterfly",
-  516: "weapon_knife_push",
-  517: "weapon_knife_cord",
-  518: "weapon_knife_canis",
-  519: "weapon_knife_ursus",
-  520: "weapon_knife_gypsy_jackknife",
-  521: "weapon_knife_outdoor",
-  522: "weapon_knife_stiletto",
-  523: "weapon_knife_widowmaker",
-  525: "weapon_knife_skeleton",
-  526: "weapon_knife_kukri",
-  503: "weapon_knife_css",
-};
+import { KNIFE_DEFINDEX_TO_CLASSNAME } from "@/lib/knife-classnames";
 
 // Defindexes de luvas (para wp_player_gloves)
 const GLOVE_DEFINDEXES = new Set([4725, 5027, 5030, 5031, 5032, 5033, 5034, 5035]);
@@ -76,19 +55,22 @@ export async function POST(req: NextRequest) {
     weapon_stattrak_count: 0,
   };
 
-  const knifeClassname = KNIFE_CLASSNAMES[defindex];
+  const knifeClassname = KNIFE_DEFINDEX_TO_CLASSNAME[defindex];
   const tasks: Promise<void>[] = [];
-  
-  console.log(`[API/WEAPON] SteamID: ${session.steamid64}, Def: ${defindex}, Paint: ${paintId}, Team: ${team}`);
-  
+
   if (team === 0) {
-    // Se for "Ambos", salvamos explicitamente para TR (2) e CT (3)
-    [2, 3].forEach(t => {
+    [2, 3].forEach((t) => {
+      if (knifeClassname) tasks.push(clearPlayerKnivesSkins(session.steamid64, t as 2 | 3));
+      if (GLOVE_DEFINDEXES.has(defindex)) tasks.push(clearPlayerGlovesSkins(session.steamid64, t as 2 | 3));
+    });
+    [2, 3].forEach((t) => {
       tasks.push(savePlayerSkin({ ...row, weapon_team: t as 2 | 3 }));
       if (knifeClassname) tasks.push(savePlayerKnife(session.steamid64, t as 2 | 3, knifeClassname));
       if (GLOVE_DEFINDEXES.has(defindex)) tasks.push(savePlayerGloves(session.steamid64, t as 2 | 3, defindex, paintId, wear, seed));
     });
   } else {
+    if (knifeClassname) tasks.push(clearPlayerKnivesSkins(session.steamid64, team));
+    if (GLOVE_DEFINDEXES.has(defindex)) tasks.push(clearPlayerGlovesSkins(session.steamid64, team));
     tasks.push(savePlayerSkin(row));
     if (knifeClassname) tasks.push(savePlayerKnife(session.steamid64, team, knifeClassname));
     if (GLOVE_DEFINDEXES.has(defindex)) tasks.push(savePlayerGloves(session.steamid64, team, defindex, paintId, wear, seed));

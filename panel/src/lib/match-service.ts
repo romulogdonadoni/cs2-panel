@@ -15,6 +15,7 @@ import {
 export async function endMatchOnServer(opts?: { training?: boolean }) {
   if (opts?.training) {
     try {
+      await sendRconCommand("css_exitprac");
       await sendRconCommand("exec MatchZy/warmup.cfg");
     } catch {
       await sendRconCommand("css_endmatch");
@@ -63,6 +64,7 @@ export function buildMatchZyConfig(matchId: string, lobbyId: string, mapId: stri
       mp_overtime_enable: ot,
       mp_overtime_maxrounds: "6",
       bot_quota: "0",
+      matchzy_record_demos: "1",
       // Não pôr sv_disable_teamselect_menu aqui: se 1 no warmup, o jogo fica em limbo (HUD “morto”)
       // até o MatchZy atribuir o time. O bloqueio do menu fica em knife.cfg / live.cfg.
     },
@@ -85,6 +87,18 @@ export async function launchMatch(
   settingsJson?: string
 ) {
   const compose = getComposeDir();
+  
+  // 0) Limpar qualquer estado anterior do MatchZy (partida ou treino) antes de começar.
+  try {
+    // Tenta sair do modo de treino se estiver ativo
+    await sendRconCommand("css_exitprac");
+    // Tenta encerrar qualquer partida que esteja a decorrer
+    await sendRconCommand("css_endmatch");
+    // Pequena pausa para o servidor processar o encerramento
+    await new Promise(r => setTimeout(r, 1000));
+  } catch (e) {
+    console.warn("[Match] Aviso ao limpar estado anterior do MatchZy:", e);
+  }
 
   // 1) Oficina: sem .vpk no volume, NUNCA mandar `host_workshop_map` (o motor cai "Error map!" e o RCON cai).
   if (/^\d+$/.test(mapId)) {

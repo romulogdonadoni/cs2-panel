@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { PanelChrome } from "@/components/panel-chrome";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,7 +28,9 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-dvh flex flex-col bg-slate-950 text-slate-100">{children}</body>
+      <body className="min-h-dvh bg-black text-slate-100">
+        <PanelChrome>{children}</PanelChrome>
+      </body>
     </html>
   );
 }

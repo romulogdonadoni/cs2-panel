@@ -58,23 +58,23 @@ function TeamBlock({
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={`text-4xl font-black tabular-nums leading-none ${
-              side === "CT" ? "text-sky-400" : "text-emerald-400"
+              side === "CT" ? "text-slate-400" : "text-emerald-400"
             }`}
           >
             {score}
           </span>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">{side}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{side}</p>
             <p className="truncate text-sm font-bold text-white">{teamName}</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-end justify-end gap-4 text-right text-[10px]">
+        <div className="flex flex-wrap items-end justify-end gap-4 text-right text-xs">
           <div>
-            <p className="text-slate-500">Team avg (DMR)</p>
+            <p className="text-slate-400">Team avg (DMR)</p>
             <p className="font-bold tabular-nums text-amber-200/90">{fmt1(teamAvgAdr)}</p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-slate-500">Rodadas disputadas</p>
+            <p className="text-slate-400">Rodadas disputadas</p>
             <p className="font-bold tabular-nums text-slate-300">{roundsPlayed}</p>
           </div>
         </div>
@@ -83,7 +83,7 @@ function TeamBlock({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-left text-[11px]">
           <thead>
-            <tr className="border-b border-white/[0.06] text-[9px] font-bold uppercase tracking-wider text-slate-500">
+            <tr className="border-b border-white/[0.06] text-xs font-bold uppercase tracking-wider text-slate-400">
               <th className="sticky left-0 z-10 bg-[#0c0c0e] px-3 py-2 pl-4">Jogador</th>
               <th className="px-1.5 py-2 text-center">K</th>
               <th className="px-1.5 py-2 text-center">D</th>
@@ -193,7 +193,7 @@ export function BroadcastHud() {
   };
 
   return (
-    <div className="min-h-dvh bg-[#070708] text-slate-100">
+    <div className="flex min-h-0 flex-1 flex-col bg-[#070708] text-slate-100">
       {roundPulse !== null && (
         <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm font-bold text-amber-200">
           Rodada {roundPulse} · placar e estatísticas atualizados
@@ -205,14 +205,14 @@ export function BroadcastHud() {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-500/90">Estatísticas da partida</p>
             <h1 className="mt-1 text-2xl font-black italic tracking-tight text-white md:text-3xl">Broadcast · scoreboard</h1>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">
               Dados <strong className="text-slate-400">acumulados do mapa</strong> (MatchZy, fim da rodada). Fonte:{" "}
               <strong className="text-slate-300">{src === "matchzy" ? "MatchZy" : "—"}</strong> · poll ~{POLL_MS / 1000}s
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {lastAge !== null && (
-              <p className="text-xs tabular-nums text-slate-500">Último pacote: há {lastAge}s</p>
+              <p className="text-xs tabular-nums text-slate-400">Último pacote: há {lastAge}s</p>
             )}
             {v && (
               <p className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-slate-300">
@@ -288,13 +288,13 @@ export function BroadcastHud() {
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 text-sm text-slate-400">
                 <p className="mb-2 font-bold text-amber-200/80">Métricas avançadas (KAST, RWS, multikills por rodada, etc.)</p>
                 <p>
-                  O que vês no separador <span className="text-slate-500">Geral</span> vem dos eventos <code className="text-slate-500">round_end</code> do
+                  O que vês no separador <span className="text-slate-400">Geral</span> vem dos eventos <code className="text-slate-400">round_end</code> do
                   MatchZy. Métricas extras (RWS, 2K/3K/4K por rodada, etc.) exigiriam outra fonte (logs ou plugin no servidor).
                 </p>
               </div>
             )}
 
-            <p className="text-center text-[10px] text-slate-600">
+            <p className="text-center text-xs leading-relaxed text-slate-400">
               Dano, MVPs e HS vêm do payload de estatísticas do MatchZy quando o servidor envia após a rodada.
             </p>
           </div>

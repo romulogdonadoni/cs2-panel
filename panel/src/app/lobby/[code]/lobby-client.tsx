@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LobbyView } from "@/components/lobby-view";
 
@@ -42,9 +43,9 @@ export function LobbyClient() {
     return (
       <div className="mx-auto max-w-md p-8 text-center text-slate-400">
         <p className="mb-4">Inicia sessão para ver a sala.</p>
-        <button type="button" className="text-accent-blue font-bold" onClick={() => { location.href = "/auth/steam"; }}>
+        <Link href="/auth/steam" className="font-bold text-white underline">
           Entrar com Steam
-        </button>
+        </Link>
       </div>
     );
   }
@@ -53,7 +54,7 @@ export function LobbyClient() {
     return (
       <div className="p-20 text-center text-slate-500 text-sm max-w-md mx-auto">
         Não foi possível abrir a sala.{" "}
-        <button type="button" className="text-accent-blue underline" onClick={() => router.push("/")}>
+        <button type="button" className="text-white underline" onClick={() => router.push("/")}>
           Voltar ao início
         </button>
       </div>

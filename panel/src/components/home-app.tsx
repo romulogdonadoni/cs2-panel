@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { Avatar, Button, Card, Tab, TabList, TabListContainer, TabPanel, Tabs } from "@heroui/react";
+import Link from "next/link";
+import { Button, Card, Tab, TabList, TabListContainer, TabPanel, Tabs } from "@heroui/react";
 import { ServerSettings } from "@/components/server-settings";
 import { LobbyView } from "@/components/lobby-view";
 
@@ -66,82 +67,6 @@ export function HomeApp() {
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/40 to-slate-950/90" />
       </div>
 
-      <header className="glass sticky top-0 z-50 px-6 py-4 flex flex-wrap items-center justify-between gap-4 border-b-0 shadow-2xl">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-accent-gold/20 flex items-center justify-center border border-accent-gold/30">
-            <span className="text-accent-gold font-bold text-xl italic">CS</span>
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              PAINEL <span className="text-accent-orange text-xs bg-accent-orange/10 px-2 py-0.5 rounded uppercase tracking-widest">PRO</span>
-            </h1>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(34,197,94,0.55)]" title="Sala activa" />
-                <span className="text-xs text-slate-300">Partida personalizada</span>
-              </div>
-              <a
-                className="text-[11px] text-cyan-400/80 hover:underline"
-                href="/broadcast"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Monitor
-              </a>
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {me ? (
-            <>
-              <div className="flex items-center gap-3 bg-white/5 pl-2 pr-4 py-1.5 rounded-full border border-white/10 ring-1 ring-white/5">
-                <Avatar className="h-8 w-8 ring-2 ring-accent-blue/30" size="sm">
-                  {me.avatar ? (
-                    <Avatar.Image src={me.avatar} alt="" className="object-cover" />
-                  ) : null}
-                  <Avatar.Fallback className="bg-slate-800 text-xs text-white">
-                    {me.name?.[0] ?? "?"}
-                  </Avatar.Fallback>
-                </Avatar>
-                <div className="hidden sm:block">
-                  <p className="text-xs font-bold text-slate-200 leading-none">
-                    {me.name || "Jogador"}
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">…{me.steamid64.slice(-6)}</p>
-                </div>
-              </div>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                className="font-bold text-amber-400 hover:text-amber-300 border border-amber-400/45 hover:border-amber-400/70 hover:bg-amber-400/5 transition-all"
-                onPress={() => { location.href = "/skins"; }}
-              >
-                <span className="mr-1" aria-hidden>
-                  🗡
-                </span>
-                SKINS
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-slate-400 hover:text-white"
-                onPress={async () => {
-                  await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-                  setMe(null);
-                }}
-              >
-                SAIR
-              </Button>
-            </>
-          ) : (
-            <Button variant="primary" className="bg-accent-gold text-black font-bold" size="sm" onPress={() => { location.href = "/auth/steam"; }}>
-              ENTRAR COM STEAM
-            </Button>
-          )}
-        </div>
-      </header>
-
       {singletonErr && (
         <div className="bg-danger-100 text-danger-800 m-3 rounded-lg px-3 py-2 text-sm border border-danger-200/50">
           {singletonErr}
@@ -155,9 +80,12 @@ export function HomeApp() {
             <p className="mt-2 text-foreground-600 text-sm">
               Autentica-te com a Steam para entrar na sala e conectar ao servidor.
             </p>
-            <Button className="mt-4" variant="primary" onPress={() => { location.href = "/auth/steam"; }}>
+            <Link
+              href="/auth/steam"
+              className="mt-4 inline-flex h-10 items-center justify-center rounded-lg bg-accent-gold px-6 text-sm font-bold text-black transition hover:bg-accent-gold/90"
+            >
               Entrar com Steam
-            </Button>
+            </Link>
           </Card>
         </div>
       ) : (
